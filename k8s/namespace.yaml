@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lifeos
+  labels:
+    app.kubernetes.io/name: lifeos
+    app.kubernetes.io/part-of: life-operations-system

@@ -1,0 +1,314 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Domain {
+  id          String         @id @default(uuid())
+  name        String
+  slug        String         @unique
+  description String?
+  color       String?        @default("#B84A39") // default terracotta accent
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  projects    Project[]
+  tasks       Task[]
+  contacts    CrmContact[]
+  content     ContentItem[]
+  events      ScheduleEvent[]
+
+  @@map("domains")
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProjectType {
+  MILESTONE
+  RETAINER
+  ONGOING_AREA
+}
+
+model Project {
+  id                  String        @id @default(uuid())
+  title               String
+  slug                String?
+  description         String?
+  status              ProjectStatus @default(ACTIVE)
+  type                ProjectType   @default(MILESTONE)
+  targetDate          DateTime?
+  hoursLogged         Float         @default(0)
+  monthlyBudgetHours  Float?
+  lastActivityAt      DateTime      @default(now())
+  domainId            String?
+  domain              Domain?       @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  tasks               Task[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([domainId])
+  @@index([status])
+  @@index([lastActivityAt])
+  @@map("projects")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  TOP_3
+  HIGH
+  NORMAL
+  LOW
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  title          String
+  notes          String?
+  status         TaskStatus   @default(TODO)
+  priority       TaskPriority @default(NORMAL)
+  dueDate        DateTime?
+  dueTime        String?
+  isTop3         Boolean      @default(false)
+  starOrder      Int?
+  isRecurring    Boolean      @default(false)
+  recurrenceRule String?      // e.g. "DAILY", "WEEKLY", "MONTHLY"
+  completedAt    DateTime?
+  domainId       String?
+  domain         Domain?      @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  projectId      String?
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
+  @@index([isTop3])
+  @@index([domainId])
+  @@index([projectId])
+  @@map("tasks")
+}
+
+model ConnectedCalendar {
+  id           String          @id @default(uuid())
+  name         String
+  type         String          @default("GOOGLE_ICAL") // GOOGLE_ICAL, GOOGLE_API
+  feedUrl      String?         // Google Calendar Secret iCal Address
+  googleCalId  String?         // Google Calendar ID (e.g. primary)
+  color        String?         @default("#4285F4")
+  isActive     Boolean         @default(true)
+  lastSyncedAt DateTime?
+  events       ScheduleEvent[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("connected_calendars")
+}
+
+model ScheduleEvent {
+  id         String             @id @default(uuid())
+  title      String
+  startTime  String?            // e.g. "2:30 PM"
+  endTime    String?
+  date       DateTime
+  location   String?
+  notes      String?
+  source     String             @default("MANUAL") // MANUAL, GOOGLE_CALENDAR, ICAL
+  externalId String?            @unique
+  calendarId String?
+  calendar   ConnectedCalendar? @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  domainId   String?
+  domain     Domain?            @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([date])
+  @@index([calendarId])
+  @@map("schedule_events")
+}
+
+enum RoutineTimeOfDay {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+model Routine {
+  id                String           @id @default(uuid())
+  title             String
+  timeOfDay         RoutineTimeOfDay @default(MORNING)
+  frequency         String           @default("DAILY") // DAILY, WEEKLY, MONTHLY
+  daysOfWeek        String?          // JSON array e.g. "[1,3,5]" for Mon/Wed/Fri (only for WEEKLY)
+  dayOfMonth        Int?             // e.g. 15 (only for MONTHLY)
+  order             Int              @default(0)
+  active            Boolean          @default(true)
+  icon              String?          // emoji or icon name
+  streak            Int              @default(0)
+  bestStreak        Int              @default(0)
+  lastCompletedDate String?          // YYYY-MM-DD
+  logs              RoutineLog[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([timeOfDay])
+  @@map("routines")
+}
+
+model RoutineLog {
+  id          String   @id @default(uuid())
+  routineId   String
+  routine     Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  date        String   // YYYY-MM-DD
+  completed   Boolean  @default(true)
+  completedAt DateTime @default(now())
+
+  @@unique([routineId, date])
+  @@map("routine_logs")
+}
+
+model CrmContact {
+  id               String           @id @default(uuid())
+  name             String
+  role             String?
+  company          String?
+  email            String?
+  phone            String?
+  notes            String?
+  familyDetails    String?          // anniversary, spouse, kids, personal facts
+  birthday         String?
+  lastInteractionAt DateTime        @default(now())
+  followUpDays     Int              @default(30) // alert if no interaction in X days
+  domainId         String?
+  domain           Domain?          @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  interactions     CrmInteraction[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([lastInteractionAt])
+  @@index([domainId])
+  @@map("crm_contacts")
+}
+
+model CrmInteraction {
+  id        String     @id @default(uuid())
+  contactId String
+  contact   CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type      String     @default("NOTE") // EMAIL, CALL, MEETING, NOTE
+  summary   String
+  date      DateTime   @default(now())
+  createdAt DateTime   @default(now())
+
+  @@index([contactId])
+  @@map("crm_interactions")
+}
+
+enum ContentStage {
+  IDEA
+  SCRIPTING
+  RECORDING
+  EDITING
+  PUBLISHED
+}
+
+model ContentItem {
+  id          String       @id @default(uuid())
+  title       String
+  type        String       @default("VIDEO") // VIDEO, ARTICLE, PODCAST, SOCIAL
+  stage       ContentStage @default(IDEA)
+  targetDate  DateTime?
+  publishDate DateTime?
+  notes       String?
+  url         String?
+  domainId    String?
+  domain      Domain?      @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([stage])
+  @@index([domainId])
+  @@map("content_items")
+}
+
+enum LibraryType {
+  QUOTE
+  HIGHLIGHT
+  NOTE
+  VERSE
+}
+
+model LibraryItem {
+  id               String      @id @default(uuid())
+  title            String
+  body             String
+  author           String?
+  source           String?
+  type             LibraryType @default(QUOTE)
+  tags             String?     // Comma-separated or JSON
+  lastResurfacedAt DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([lastResurfacedAt])
+  @@map("library_items")
+}
+
+enum InboxStatus {
+  NEEDS_REVIEW
+  TRIAGED
+  ARCHIVED
+}
+
+model InboxItem {
+  id              String      @id @default(uuid())
+  title           String
+  rawContent      String
+  source          String      @default("QUICK_CAPTURE") // QUICK_CAPTURE, VOICE, EMAIL_WEBHOOK, API, SHORTCUT
+  status          InboxStatus @default(NEEDS_REVIEW)
+  suggestedDomain String?
+  suggestedType   String?     // TASK, NOTE, EVENT, CONTACT
+  metadata        String?     // JSON string for email headers, links, etc.
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([status])
+  @@map("inbox_items")
+}
+
+model SystemNotification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, TASK_CREATED, ATTENTION, EMAIL
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([read])
+  @@map("system_notifications")
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -1,0 +1,80 @@
+services:
+  # ==============================================================================
+  # PostgreSQL 16 Alpine Database
+  # ==============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: lifeos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lifeos}
+      POSTGRES_USER: ${POSTGRES_USER:-lifeos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_secure_password_in_production}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - lifeos_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lifeos_user} -d ${POSTGRES_DB:-lifeos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ==============================================================================
+  # Life OS Dashboard Application (Next.js Standalone)
+  # ==============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lifeos-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lifeos_user}:${POSTGRES_PASSWORD:-change_this_secure_password_in_production}@db:5432/${POSTGRES_DB:-lifeos}?schema=public
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      
+      # Hybrid AI Configuration
+      AI_PROVIDER: ${AI_PROVIDER:-auto}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - lifeos_network
+
+  # ==============================================================================
+  # Optional Local Ollama Service (uncomment or run with: docker compose --profile local-llm up)
+  # ==============================================================================
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: lifeos-ollama
+  #   profiles: ["local-llm"]
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ollama_models:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - lifeos_network
+
+volumes:
+  pgdata:
+    driver: local
+  # ollama_models:
+  #   driver: local
+
+networks:
+  lifeos_network:
+    driver: bridge

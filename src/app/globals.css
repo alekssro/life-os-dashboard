@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default: Warm Paper */
+  --paper-bg: #FAF6F0;
+  --paper-card: #FAF6F0;
+  --paper-card-subtle: #F3EDE3;
+  --paper-border: #E8E1D5;
+  --paper-border-strong: #D6CCC0;
+  --paper-text: #2C2623;
+  --paper-muted: #756D67;
+  --paper-accent: #B34636;
+  --paper-accent-hover: #98382A;
+  --paper-star: #B34636;
+  --paper-tag: #8C847D;
+  --paper-highlight: #F5EEE4;
+  --font-serif: "Newsreader", "Charter", "Georgia", "Cambria", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+[data-theme="eink"] {
+  /* Pure E-Paper / E-Ink Tablet Optimized: High contrast, zero blur, sharp 1px borders */
+  --paper-bg: #FFFFFF;
+  --paper-card: #FFFFFF;
+  --paper-card-subtle: #F4F4F4;
+  --paper-border: #000000;
+  --paper-border-strong: #000000;
+  --paper-text: #000000;
+  --paper-muted: #444444;
+  --paper-accent: #000000;
+  --paper-accent-hover: #222222;
+  --paper-star: #000000;
+  --paper-tag: #000000;
+  --paper-highlight: #EEEEEE;
+}
+
+[data-theme="light"] {
+  /* Minimal Crisp Clean White (Mobile/Desktop daylight) */
+  --paper-bg: #F8FAFC;
+  --paper-card: #FFFFFF;
+  --paper-card-subtle: #F1F5F9;
+  --paper-border: #E2E8F0;
+  --paper-border-strong: #CBD5E1;
+  --paper-text: #0F172A;
+  --paper-muted: #64748B;
+  --paper-accent: #2563EB;
+  --paper-accent-hover: #1D4ED8;
+  --paper-star: #F59E0B;
+  --paper-tag: #64748B;
+  --paper-highlight: #EFF6FF;
+}
+
+[data-theme="dark"] {
+  /* OLED Midnight Dark (Mobile & Night) */
+  --paper-bg: #0F1115;
+  --paper-card: #16181F;
+  --paper-card-subtle: #1E212A;
+  --paper-border: #282C37;
+  --paper-border-strong: #3E4353;
+  --paper-text: #EDEDED;
+  --paper-muted: #959BA7;
+  --paper-accent: #E06C54;
+  --paper-accent-hover: #F07E67;
+  --paper-star: #F59E0B;
+  --paper-tag: #8E95A5;
+  --paper-highlight: #232733;
+}
+
+/* Global Styles */
+body {
+  background-color: var(--paper-bg);
+  color: var(--paper-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+/* E-Ink optimizations: disable expensive animations when in eink mode */
+[data-theme="eink"] * {
+  transition: none !important;
+  animation: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Scrollbar styling matching paper */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--paper-border-strong);
+  border-radius: 3px;
+}
