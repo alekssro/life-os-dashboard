@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseCaptureInput } from '@/lib/ai/parser';
+import { parseFlexibleDate } from '@/lib/date';
 import { validateApiKey, checkRateLimit } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -193,13 +194,18 @@ export async function POST(req: NextRequest) {
 
       // F. TASK (Direct without AI)
       if (targetType === 'TASK') {
+        const dueDate = parseFlexibleDate(extraDetails.dueDate);
+        if (extraDetails.dueDate && !dueDate) {
+          return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
+        }
+
         const task = await prisma.task.create({
           data: {
             title: cleanText,
             notes: extraDetails.notes || null,
             status: 'TODO',
             priority: extraDetails.priority || 'NORMAL',
-            dueDate: extraDetails.dueDate ? new Date(extraDetails.dueDate) : null,
+            dueDate,
             isTop3: Boolean(extraDetails.isTop3),
             domainId: extraDetails.domainId || null,
             projectId: extraDetails.projectId || null,
@@ -269,7 +275,7 @@ export async function POST(req: NextRequest) {
 
     // Action routing
     if (parsed.action === 'CREATE_EVENT') {
-      const eventDate = parsed.due_date ? new Date(parsed.due_date) : new Date();
+      const eventDate = parseFlexibleDate(parsed.due_date) ?? new Date();
       const event = await prisma.scheduleEvent.create({
         data: {
           title: parsed.title,
@@ -318,7 +324,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Default: CREATE_TASK
-    const dueDate = parsed.due_date ? new Date(parsed.due_date) : null;
+    const dueDate = parseFlexibleDate(parsed.due_date);
     const isTop3 = parsed.priority === 'TOP_3';
 
     const task = await prisma.task.create({

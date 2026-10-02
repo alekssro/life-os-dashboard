@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parseFlexibleDate } from '@/lib/date';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -37,13 +38,19 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+
+    const dueDate = parseFlexibleDate(data.dueDate);
+    if (data.dueDate && !dueDate) {
+      return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
+    }
+
     const task = await prisma.task.create({
       data: {
         title: data.title,
         notes: data.notes,
         status: data.status || 'TODO',
         priority: data.priority || 'NORMAL',
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        dueDate,
         dueTime: data.dueTime,
         isTop3: Boolean(data.isTop3),
         domainId: data.domainId || null,
@@ -88,7 +95,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (updates.dueDate) {
-      updates.dueDate = new Date(updates.dueDate);
+      const parsedDueDate = parseFlexibleDate(updates.dueDate);
+      if (!parsedDueDate) {
+        return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
+      }
+      updates.dueDate = parsedDueDate;
     }
 
     const task = await prisma.task.update({

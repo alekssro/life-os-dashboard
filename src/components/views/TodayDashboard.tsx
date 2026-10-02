@@ -19,7 +19,9 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { NavItem } from '../Sidebar';
-import { formatDateDDMMYYYY } from '@/lib/date';
+import { formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, toISODate } from '@/lib/date';
+import { EditTaskPanel } from '@/components/EditTaskPanel';
+import { EditRoutinePanel } from '@/components/EditRoutinePanel';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
@@ -28,6 +30,7 @@ interface TodayDashboardProps {
 
 export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProps) {
   const [tasks, setTasks] = useState<any[]>([]);
+  const [domains, setDomains] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [routinesData, setRoutinesData] = useState<{
     routines: any[];
@@ -40,6 +43,8 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncingCal, setIsSyncingCal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingRoutineId, setEditingRoutineId] = useState<string | null>(null);
 
   const handleSyncCalendar = async () => {
     setIsSyncingCal(true);
@@ -59,6 +64,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
     try {
       const [
         tasksRes,
+        domainsRes,
         eventsRes,
         routinesRes,
         libraryRes,
@@ -67,6 +73,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
         notificationsRes,
       ] = await Promise.all([
         fetch('/api/tasks'),
+        fetch('/api/domains'),
         fetch('/api/events'),
         fetch('/api/routines'),
         fetch('/api/library?resurface=true'),
@@ -76,6 +83,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
       ]);
 
       if (tasksRes.ok) setTasks(await tasksRes.json());
+      if (domainsRes.ok) setDomains(await domainsRes.json());
       if (eventsRes.ok) setEvents(await eventsRes.json());
       if (routinesRes.ok) setRoutinesData(await routinesRes.json());
       if (libraryRes.ok) setResurfacedItem(await libraryRes.json());
@@ -137,11 +145,35 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
       completedCount: nextVal ? prev.completedCount + 1 : Math.max(0, prev.completedCount - 1),
     }));
 
-    await fetch('/api/routines', {
+    const res = await fetch('/api/routines', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ routineId, completed: nextVal }),
     });
+
+    // e.g. routine no longer scheduled for today — fall back to server truth
+    if (!res.ok) loadData();
+  };
+
+  // Inline edit actions (tap the object, not the checkbox)
+  const saveTask = async (id: string, updates: any) => {
+    setEditingTaskId(null);
+    const res = await fetch('/api/tasks', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    });
+    if (res.ok) loadData();
+  };
+
+  const saveRoutine = async (id: string, updates: any) => {
+    setEditingRoutineId(null);
+    const res = await fetch('/api/routines', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    });
+    if (res.ok) loadData();
   };
 
   // Inbox triage action
@@ -158,11 +190,74 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   const top3Tasks = tasks.filter((t) => t.isTop3 && t.status !== 'DONE');
   const openTasks = tasks.filter((t) => !t.isTop3 && t.status !== 'DONE');
 
-  const morningRoutines = routinesData.routines.filter((r) => r.timeOfDay === 'MORNING');
-  const afternoonRoutines = routinesData.routines.filter((r) => r.timeOfDay === 'AFTERNOON');
-  const eveningRoutines = routinesData.routines.filter((r) => r.timeOfDay === 'EVENING');
+  // Only routines scheduled for today belong in the Today Briefing.
+  const dueRoutines = routinesData.routines.filter((r) => r.isDueToday);
+  const morningRoutines = dueRoutines.filter((r) => r.timeOfDay === 'MORNING');
+  const afternoonRoutines = dueRoutines.filter((r) => r.timeOfDay === 'AFTERNOON');
+  const eveningRoutines = dueRoutines.filter((r) => r.timeOfDay === 'EVENING');
 
   const openSpotsNeeded = Math.max(0, 3 - top3Tasks.length);
+
+  // Single "now" for the whole render so the heading and date maths never disagree.
+  const now = new Date();
+  const todayISOStr = toISODate(now);
+
+  // Tap the routine (not the checkbox) to edit it inline.
+  const renderRoutineRow = (r: any) => (
+    <div key={r.id}>
+      <div
+        onClick={() => setEditingRoutineId(editingRoutineId === r.id ? null : r.id)}
+        className={`flex items-center justify-between p-2 rounded cursor-pointer text-xs ${
+          editingRoutineId === r.id
+            ? 'bg-[var(--paper-card-subtle)] ring-1 ring-[var(--paper-accent)]'
+            : 'hover:bg-[var(--paper-card-subtle)]'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRoutine(r.id, r.isCompletedToday);
+            }}
+            className="shrink-0"
+            title={r.isCompletedToday ? 'Mark as not done' : 'Mark as done'}
+          >
+            {r.isCompletedToday ? (
+              <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
+            ) : (
+              <Square className="w-4 h-4 text-[var(--paper-muted)]" />
+            )}
+          </button>
+          <span
+            className={
+              r.isCompletedToday
+                ? 'line-through text-[var(--paper-muted)]'
+                : 'text-[var(--paper-text)] font-medium'
+            }
+          >
+            {r.icon && <span className="mr-1.5">{r.icon}</span>}
+            {r.title}
+          </span>
+        </div>
+        {r.streak > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-accent)]">
+            <Flame className="w-3 h-3 fill-current" />
+            {r.streak}
+          </span>
+        )}
+      </div>
+
+      {editingRoutineId === r.id && (
+        <div className="mt-1.5 p-2 rounded border border-[var(--paper-accent)]/60 bg-[var(--paper-card-subtle)]">
+          <EditRoutinePanel
+            routine={r}
+            onSave={(updates) => saveRoutine(r.id, updates)}
+            onCancel={() => setEditingRoutineId(null)}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
@@ -173,7 +268,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             Today Briefing
           </h1>
           <p className="text-xs font-mono text-[var(--paper-muted)] mt-1 uppercase tracking-wider">
-            {new Date().toLocaleDateString('en-GB', { weekday: 'long' })}, {formatDateDDMMYYYY(new Date())}
+            {formatWeekday(now)}, {formatDateDDMMYYYY(now)}
           </p>
         </div>
 
@@ -211,13 +306,23 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
               {top3Tasks.map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-start justify-between p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card)] hover:border-[var(--paper-border-strong)] transition-colors group"
+                  onClick={() => setEditingTaskId(editingTaskId === task.id ? null : task.id)}
+                  className={`p-3 rounded border bg-[var(--paper-card)] transition-colors group cursor-pointer ${
+                    editingTaskId === task.id
+                      ? 'border-[var(--paper-accent)]'
+                      : 'border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
+                  }`}
                 >
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <button
-                      onClick={() => toggleTaskStatus(task)}
-                      className="mt-0.5 text-[var(--paper-muted)] hover:text-[var(--paper-accent)]"
-                    >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTaskStatus(task);
+                        }}
+                        className="mt-0.5 text-[var(--paper-muted)] hover:text-[var(--paper-accent)]"
+                        title={task.status === 'DONE' ? 'Mark as not done' : 'Mark as done'}
+                      >
                       {task.status === 'DONE' ? (
                         <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
                       ) : (
@@ -246,12 +351,25 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                   </div>
 
                   <button
-                    onClick={() => toggleTop3(task)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTop3(task);
+                    }}
                     className="p-1 text-[var(--paper-star)] hover:opacity-80 ml-2"
                     title="Remove from Top 3"
                   >
                     <Star className="w-4 h-4 fill-current" />
                   </button>
+                  </div>
+
+                  {editingTaskId === task.id && (
+                    <EditTaskPanel
+                      task={task}
+                      domains={domains}
+                      onSave={(updates) => saveTask(task.id, updates)}
+                      onCancel={() => setEditingTaskId(null)}
+                    />
+                  )}
                 </div>
               ))}
 
@@ -309,7 +427,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                   >
                     <div className="w-24 shrink-0 font-mono text-xs font-medium text-[var(--paper-muted)]">
                       <div>{ev.startTime || 'All Day'}</div>
-                      {ev.date && new Date(ev.date).toDateString() !== new Date().toDateString() && (
+                      {ev.date && toISODate(ev.date) !== todayISOStr && (
                         <div className="text-[10px] text-[var(--paper-muted)]/80">
                           {formatDateDDMMYYYY(ev.date)}
                         </div>
@@ -341,7 +459,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                 ))
               ) : (
                 <div className="p-4 rounded border border-[var(--paper-border)] text-xs text-[var(--paper-muted)] italic text-center font-serif">
-                  No upcoming schedule events for today.
+                  Nothing scheduled from today onwards.
                 </div>
               )}
             </div>
@@ -371,15 +489,25 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
               {openTasks.slice(0, 10).map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-start justify-between p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card)] hover:border-[var(--paper-border-strong)] transition-colors group"
+                  onClick={() => setEditingTaskId(editingTaskId === task.id ? null : task.id)}
+                  className={`p-3 rounded border bg-[var(--paper-card)] transition-colors group cursor-pointer ${
+                    editingTaskId === task.id
+                      ? 'border-[var(--paper-accent)]'
+                      : 'border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
+                  }`}
                 >
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <button
-                      onClick={() => toggleTaskStatus(task)}
-                      className="mt-0.5 text-[var(--paper-muted)] hover:text-[var(--paper-accent)]"
-                    >
-                      <Square className="w-4 h-4" />
-                    </button>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTaskStatus(task);
+                        }}
+                        className="mt-0.5 text-[var(--paper-muted)] hover:text-[var(--paper-accent)]"
+                        title="Mark as done"
+                      >
+                        <Square className="w-4 h-4" />
+                      </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--paper-text)] leading-snug">
                         {task.title}
@@ -396,8 +524,16 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                         )}
 
                         {task.dueDate && (
-                          <span className="text-[10px] font-mono text-[var(--paper-accent)] uppercase">
-                            {new Date(task.dueDate) < new Date() ? 'Overdue' : 'Due Soon'}
+                          <span className="text-[10px] font-mono text-[var(--paper-accent)] uppercase flex items-center gap-1">
+                            {formatDateDDMMYYYY(task.dueDate)}
+                            <span className="text-[var(--paper-muted)] font-semibold">
+                              ·{' '}
+                              {toISODate(task.dueDate) < todayISOStr
+                                ? 'Overdue'
+                                : toISODate(task.dueDate) === todayISOStr
+                                ? 'Due Today'
+                                : 'Upcoming'}
+                            </span>
                           </span>
                         )}
 
@@ -412,12 +548,25 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                   </div>
 
                   <button
-                    onClick={() => toggleTop3(task)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTop3(task);
+                    }}
                     className="p-1 text-[var(--paper-muted)] hover:text-[var(--paper-star)] ml-2"
                     title="Star to promote to Top 3"
                   >
                     <Star className="w-4 h-4" />
                   </button>
+                  </div>
+
+                  {editingTaskId === task.id && (
+                    <EditTaskPanel
+                      task={task}
+                      domains={domains}
+                      onSave={(updates) => saveTask(task.id, updates)}
+                      onCancel={() => setEditingTaskId(null)}
+                    />
+                  )}
                 </div>
               ))}
 
@@ -489,6 +638,12 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             </div>
 
             <div className="space-y-4">
+              {dueRoutines.length === 0 && (
+                <div className="p-4 rounded border border-dashed border-[var(--paper-border-strong)] text-xs text-[var(--paper-muted)] italic text-center font-serif">
+                  No routines scheduled for today.
+                </div>
+              )}
+
               {/* Morning */}
               {morningRoutines.length > 0 && (
                 <div>
@@ -496,37 +651,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                     Morning
                   </h3>
                   <div className="space-y-1.5">
-                    {morningRoutines.map((r) => (
-                      <div
-                        key={r.id}
-                        onClick={() => toggleRoutine(r.id, r.isCompletedToday)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-[var(--paper-card-subtle)] cursor-pointer text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {r.isCompletedToday ? (
-                            <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[var(--paper-muted)]" />
-                          )}
-                          <span
-                            className={
-                              r.isCompletedToday
-                                ? 'line-through text-[var(--paper-muted)]'
-                                : 'text-[var(--paper-text)] font-medium'
-                            }
-                          >
-                            {r.icon && <span className="mr-1.5">{r.icon}</span>}
-                            {r.title}
-                          </span>
-                        </div>
-                        {r.streak > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-accent)]">
-                            <Flame className="w-3 h-3 fill-current" />
-                            {r.streak}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                    {morningRoutines.map(renderRoutineRow)}
                   </div>
                 </div>
               )}
@@ -538,37 +663,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                     Afternoon
                   </h3>
                   <div className="space-y-1.5">
-                    {afternoonRoutines.map((r) => (
-                      <div
-                        key={r.id}
-                        onClick={() => toggleRoutine(r.id, r.isCompletedToday)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-[var(--paper-card-subtle)] cursor-pointer text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {r.isCompletedToday ? (
-                            <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[var(--paper-muted)]" />
-                          )}
-                          <span
-                            className={
-                              r.isCompletedToday
-                                ? 'line-through text-[var(--paper-muted)]'
-                                : 'text-[var(--paper-text)] font-medium'
-                            }
-                          >
-                            {r.icon && <span className="mr-1.5">{r.icon}</span>}
-                            {r.title}
-                          </span>
-                        </div>
-                        {r.streak > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-accent)]">
-                            <Flame className="w-3 h-3 fill-current" />
-                            {r.streak}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                    {afternoonRoutines.map(renderRoutineRow)}
                   </div>
                 </div>
               )}
@@ -580,37 +675,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                     Evening
                   </h3>
                   <div className="space-y-1.5">
-                    {eveningRoutines.map((r) => (
-                      <div
-                        key={r.id}
-                        onClick={() => toggleRoutine(r.id, r.isCompletedToday)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-[var(--paper-card-subtle)] cursor-pointer text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {r.isCompletedToday ? (
-                            <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[var(--paper-muted)]" />
-                          )}
-                          <span
-                            className={
-                              r.isCompletedToday
-                                ? 'line-through text-[var(--paper-muted)]'
-                                : 'text-[var(--paper-text)] font-medium'
-                            }
-                          >
-                            {r.icon && <span className="mr-1.5">{r.icon}</span>}
-                            {r.title}
-                          </span>
-                        </div>
-                        {r.streak > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-accent)]">
-                            <Flame className="w-3 h-3 fill-current" />
-                            {r.streak}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                    {eveningRoutines.map(renderRoutineRow)}
                   </div>
                 </div>
               )}
@@ -748,10 +813,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                     </p>
                   </div>
                   <span className="text-[10px] font-mono text-[var(--paper-muted)] uppercase shrink-0 ml-2">
-                    {new Date(notif.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatTimeHHMM(notif.createdAt)}
                   </span>
                 </div>
               ))}

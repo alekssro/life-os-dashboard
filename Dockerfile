@@ -33,8 +33,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Install curl for healthcheck, openssl for prisma, and prisma CLI
-RUN apk add --no-cache openssl curl && \
+# Install curl for healthcheck, openssl for prisma, tzdata for local-time "today"
+# calculations (routine schedules, streaks), and prisma CLI
+RUN apk add --no-cache openssl curl tzdata && \
     npm install -g prisma@5.22.0
 
 # Create unprivileged system user & group

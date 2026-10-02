@@ -162,40 +162,13 @@ async function main() {
     await prisma.task.create({ data: t });
   }
 
-  // 5. Up Next Calendar Events (Matching Screenshot!)
-  const scheduleEventsData = [
-    {
-      title: 'Jerad and Sam Josephson',
-      startTime: '2:30 PM',
-      date: new Date(),
-      location: 'Office / Call',
-    },
-    {
-      title: 'Mal Dinner',
-      startTime: 'Fri 7:00 PM',
-      date: new Date(),
-      location: 'Montana Prime Steakhouse',
-    },
-    {
-      title: 'Church',
-      startTime: 'Sun 11:00 AM',
-      date: new Date(),
-      location: 'Easthaven Baptist Church, 2010 Whitefish Stage Rd, Kalispell, MT',
-    },
-    {
-      title: 'Table Group',
-      startTime: 'Mon 6:00 AM',
-      date: new Date(),
-      location: 'Black Rifle Coffee Company, 305 Second Ave W, Kalispell, MT',
-    },
-  ];
-
-  for (const ev of scheduleEventsData) {
-    await prisma.scheduleEvent.create({ data: ev });
-  }
+  // 5. Schedule events are intentionally not seeded: the Up Next widget is fed
+  //    by real Google Calendar sync, not example entries.
 
   // 6. Routines (Morning, Afternoon, Evening with Streaks matching screenshot!)
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
   const r1 = await prisma.routine.create({
     data: {

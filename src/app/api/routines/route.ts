@@ -2,32 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-
-// Helper: is this routine due today based on its frequency?
-function isDueToday(routine: {
-  frequency: string;
-  daysOfWeek: string | null;
-  dayOfMonth: number | null;
-}): boolean {
-  const now = new Date();
-  if (routine.frequency === 'DAILY') return true;
-  if (routine.frequency === 'WEEKLY') {
-    if (!routine.daysOfWeek) return false;
-    try {
-      const days: number[] = JSON.parse(routine.daysOfWeek);
-      return days.includes(now.getDay()); // 0=Sun, 1=Mon, …
-    } catch {
-      return false;
-    }
-  }
-  if (routine.frequency === 'MONTHLY') {
-    return now.getDate() === (routine.dayOfMonth ?? 1);
-  }
-  return true;
-}
+import { todayISO } from '@/lib/date';
+import { isDueToday } from '@/lib/routines';
 
 export async function GET() {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
 
   const routines = await prisma.routine.findMany({
     where: { active: true },
@@ -58,8 +37,10 @@ export async function GET() {
     isCompletedToday: r.logs.length > 0 && r.logs[0].completed,
   }));
 
-  const total = formatted.length;
-  const completedCount = formatted.filter((f) => f.isCompletedToday && f.isDueToday).length;
+  // Only routines scheduled for today count toward the day's progress.
+  const dueToday = formatted.filter((f) => f.isDueToday);
+  const total = dueToday.length;
+  const completedCount = dueToday.filter((f) => f.isCompletedToday).length;
 
   return NextResponse.json({
     routines: formatted,
@@ -101,11 +82,18 @@ export async function POST(req: NextRequest) {
 
     // 2. Toggling routine completion
     const { routineId, completed } = data;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = todayISO();
 
     const routine = await prisma.routine.findUnique({ where: { id: routineId } });
     if (!routine) {
       return NextResponse.json({ error: 'Routine not found' }, { status: 404 });
+    }
+
+    if (completed && !isDueToday(routine)) {
+      return NextResponse.json(
+        { error: `${routine.title} is not scheduled for today` },
+        { status: 400 }
+      );
     }
 
     if (completed) {

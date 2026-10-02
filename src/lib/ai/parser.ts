@@ -1,3 +1,5 @@
+import { parseFlexibleDate, toISODate } from '@/lib/date';
+
 export interface ParsedCapture {
   action: 'CREATE_TASK' | 'CREATE_EVENT' | 'CREATE_CRM_CONTACT' | 'CREATE_LIBRARY_ITEM' | 'CREATE_CONTENT_ITEM' | 'INBOX_TRIAGE';
   title: string;
@@ -31,7 +33,8 @@ Return strictly JSON with the following schema:
   "confidence": 0.0 to 1.0,
   "requires_triage": true or false (true if ambiguous or confidence < 0.7)
 }
-Only output valid JSON. Do not include markdown codeblocks or explanation.`;
+Only output valid JSON. Do not include markdown codeblocks or explanation.
+Dates written by the user are day-first DD/MM/YYYY (e.g. 05/10/2026 = 5 October 2026), but always return due_date as YYYY-MM-DD.`;
 
 // 1. Local Ollama Provider (Open Source)
 async function parseWithOllama(text: string): Promise<ParsedCapture | null> {
@@ -204,15 +207,23 @@ export function parseRuleBased(text: string): ParsedCapture {
   const isEvent = lower.includes('meeting') || lower.includes('dinner') || lower.includes('lunch') || lower.includes('call with') || lower.includes('coffee with');
   const timeMatch = trimmed.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i);
 
-  // Today / Tomorrow / Day detection
-  const today = new Date();
+  // Explicit date (DD/MM/YYYY) wins, otherwise today / tomorrow. Resolved in local time.
   let dueDate: string | undefined = undefined;
-  if (lower.includes('today')) {
-    dueDate = today.toISOString().split('T')[0];
-  } else if (lower.includes('tomorrow')) {
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    dueDate = tomorrow.toISOString().split('T')[0];
+  const explicitDate = trimmed.match(/\b\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\b/);
+  if (explicitDate) {
+    const parsed = parseFlexibleDate(explicitDate[0]);
+    if (parsed) dueDate = toISODate(parsed);
+  }
+
+  if (!dueDate) {
+    const today = new Date();
+    if (lower.includes('today')) {
+      dueDate = toISODate(today);
+    } else if (lower.includes('tomorrow')) {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      dueDate = toISODate(tomorrow);
+    }
   }
 
   // Priority detection
@@ -235,6 +246,7 @@ export function parseRuleBased(text: string): ParsedCapture {
 
   const cleanTitle = trimmed
     .replace(/#\w+/g, '')
+    .replace(/\b\d{1,2}[/.-]\d{1,2}[/.-]\d{4}\b/g, '')
     .replace(/\b(today|tomorrow|asap|urgent|top\s*3)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();

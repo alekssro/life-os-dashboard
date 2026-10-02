@@ -17,6 +17,7 @@ import {
   Layers,
   Star,
 } from 'lucide-react';
+import { DateInput } from '@/components/DateInput';
 
 export type CaptureType = 'AUTO' | 'TASK' | 'ROUTINE' | 'PROJECT' | 'PERSON' | 'QUOTE' | 'DOMAIN';
 
@@ -336,10 +337,9 @@ export function CaptureModal({ isOpen, onClose, onCaptured }: CaptureModalProps)
                 <label className="block text-[10px] font-mono text-[var(--paper-muted)] uppercase mb-0.5">
                   Due Date
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={setDueDate}
                   className="w-full bg-[var(--paper-card-subtle)] text-[var(--paper-text)] p-1.5 rounded border border-[var(--paper-border)] text-xs font-mono"
                 />
               </div>

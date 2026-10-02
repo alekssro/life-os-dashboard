@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseCaptureInput } from '@/lib/ai/parser';
+import { parseFlexibleDate } from '@/lib/date';
 import { validateApiKey } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
         notes: `${parsed.notes || ''}\n\nFrom: ${fromAddress}${emailPermalink ? `\nEmail Link: ${emailPermalink}` : ''}`.trim(),
         status: 'TODO',
         priority: parsed.priority || 'NORMAL',
-        dueDate: parsed.due_date ? new Date(parsed.due_date) : null,
+        dueDate: parseFlexibleDate(parsed.due_date),
       },
     });
 

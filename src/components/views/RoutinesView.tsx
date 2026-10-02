@@ -10,192 +10,13 @@ import {
   ChevronUp,
   ChevronDown,
   Pencil,
-  X,
-  Check,
 } from 'lucide-react';
-
-const FREQUENCY_OPTIONS = [
-  { value: 'DAILY', label: 'Daily' },
-  { value: 'WEEKLY', label: 'Weekly (choose days)' },
-  { value: 'MONTHLY', label: 'Monthly (choose day)' },
-];
-
-const DAYS_OF_WEEK = [
-  { value: 0, label: 'Sun' },
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
-];
-
-function FrequencyBadge({ routine }: { routine: any }) {
-  if (routine.frequency === 'DAILY') return null;
-  if (routine.frequency === 'WEEKLY') {
-    try {
-      const days: number[] = JSON.parse(routine.daysOfWeek || '[]');
-      const labels = days.map((d) => DAYS_OF_WEEK.find((x) => x.value === d)?.label).filter(Boolean);
-      return (
-        <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border border-[var(--paper-border)] text-[var(--paper-muted)]">
-          {labels.join(' · ')}
-        </span>
-      );
-    } catch {
-      return null;
-    }
-  }
-  if (routine.frequency === 'MONTHLY') {
-    return (
-      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border border-[var(--paper-border)] text-[var(--paper-muted)]">
-        Monthly / day {routine.dayOfMonth || 1}
-      </span>
-    );
-  }
-  return null;
-}
-
-function EditRoutinePanel({
-  routine,
-  onSave,
-  onCancel,
-}: {
-  routine: any;
-  onSave: (updates: any) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState(routine.title);
-  const [icon, setIcon] = useState(routine.icon || '✨');
-  const [timeOfDay, setTimeOfDay] = useState(routine.timeOfDay);
-  const [frequency, setFrequency] = useState(routine.frequency || 'DAILY');
-  const [selectedDays, setSelectedDays] = useState<number[]>(() => {
-    try {
-      return JSON.parse(routine.daysOfWeek || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
-
-  const toggleDay = (d: number) =>
-    setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      title: title.trim(),
-      icon: icon.trim() || '✨',
-      timeOfDay,
-      frequency,
-      daysOfWeek: frequency === 'WEEKLY' ? JSON.stringify(selectedDays) : null,
-      dayOfMonth: frequency === 'MONTHLY' ? dayOfMonth : null,
-    });
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      onClick={(e) => e.stopPropagation()}
-      className="mt-3 pt-3 border-t border-[var(--paper-border)] space-y-2"
-    >
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          className="w-14 text-center bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1.5 rounded border border-[var(--paper-border)] text-sm"
-          title="Emoji"
-        />
-        <input
-          autoFocus
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="flex-1 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1.5 rounded border border-[var(--paper-border)] text-sm focus:outline-none focus:border-[var(--paper-accent)]"
-          placeholder="Routine title…"
-          required
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {/* Time of day */}
-        <select
-          value={timeOfDay}
-          onChange={(e) => setTimeOfDay(e.target.value)}
-          className="bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1 rounded border border-[var(--paper-border)] text-xs font-mono"
-        >
-          <option value="MORNING">Morning</option>
-          <option value="AFTERNOON">Afternoon</option>
-          <option value="EVENING">Evening</option>
-        </select>
-
-        {/* Frequency */}
-        <select
-          value={frequency}
-          onChange={(e) => setFrequency(e.target.value)}
-          className="bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1 rounded border border-[var(--paper-border)] text-xs font-mono"
-        >
-          {FREQUENCY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Weekly day picker */}
-      {frequency === 'WEEKLY' && (
-        <div className="flex flex-wrap gap-1">
-          {DAYS_OF_WEEK.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              onClick={() => toggleDay(d.value)}
-              className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase border transition-colors ${
-                selectedDays.includes(d.value)
-                  ? 'bg-[var(--paper-accent)] text-white border-[var(--paper-accent)]'
-                  : 'border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)]'
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Monthly day picker */}
-      {frequency === 'MONTHLY' && (
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-mono text-[var(--paper-muted)]">Day of month:</label>
-          <input
-            type="number"
-            min={1}
-            max={31}
-            value={dayOfMonth}
-            onChange={(e) => setDayOfMonth(e.target.value)}
-            className="w-16 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
-          />
-        </div>
-      )}
-
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex items-center gap-1 px-3 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-[var(--paper-muted)] hover:text-[var(--paper-text)]"
-        >
-          <X className="w-3 h-3" /> Cancel
-        </button>
-        <button
-          type="submit"
-          className="flex items-center gap-1 px-3 py-1 rounded bg-[var(--paper-accent)] text-white text-xs font-mono"
-        >
-          <Check className="w-3 h-3" /> Save
-        </button>
-      </div>
-    </form>
-  );
-}
+import {
+  EditRoutinePanel,
+  FrequencyBadge,
+  FREQUENCY_OPTIONS,
+  DAYS_OF_WEEK,
+} from '@/components/EditRoutinePanel';
 
 export function RoutinesView() {
   const [routinesData, setRoutinesData] = useState<any>({ routines: [] });
@@ -394,7 +215,8 @@ export function RoutinesView() {
               {items.map((r: any, idx: number) => (
                 <div
                   key={r.id}
-                  className={`p-3 rounded border bg-[var(--paper-card)] transition-colors group ${
+                  onClick={() => setEditingId(editingId === r.id ? null : r.id)}
+                  className={`p-3 rounded border bg-[var(--paper-card)] transition-colors group cursor-pointer ${
                     editingId === r.id
                       ? 'border-[var(--paper-accent)]'
                       : !r.isDueToday
@@ -404,17 +226,30 @@ export function RoutinesView() {
                 >
                   {/* Main row */}
                   <div className="flex items-center justify-between">
-                    <div
-                      className="flex items-center gap-3 flex-1 min-w-0 mr-2 cursor-pointer"
-                      onClick={(e) => r.isDueToday && toggleRoutine(r.id, r.isCompletedToday, e)}
-                    >
-                      {r.isCompletedToday ? (
-                        <CheckSquare className="w-5 h-5 text-[var(--paper-accent)] shrink-0" />
-                      ) : r.isDueToday ? (
-                        <Square className="w-5 h-5 text-[var(--paper-muted)] shrink-0" />
-                      ) : (
-                        <Square className="w-5 h-5 text-[var(--paper-muted)]/30 shrink-0" />
-                      )}
+                    <div className="flex items-center gap-3 flex-1 min-w-0 mr-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (r.isDueToday) toggleRoutine(r.id, r.isCompletedToday, e);
+                        }}
+                        disabled={!r.isDueToday}
+                        className="shrink-0 disabled:cursor-not-allowed"
+                        title={
+                          !r.isDueToday
+                            ? 'Not scheduled today'
+                            : r.isCompletedToday
+                            ? 'Mark as not done'
+                            : 'Mark as done'
+                        }
+                      >
+                        {r.isCompletedToday ? (
+                          <CheckSquare className="w-5 h-5 text-[var(--paper-accent)]" />
+                        ) : r.isDueToday ? (
+                          <Square className="w-5 h-5 text-[var(--paper-muted)]" />
+                        ) : (
+                          <Square className="w-5 h-5 text-[var(--paper-muted)]/30" />
+                        )}
+                      </button>
                       <span className="text-base shrink-0">{r.icon}</span>
                       <div className="flex-1 min-w-0">
                         <span
@@ -448,7 +283,10 @@ export function RoutinesView() {
                       {/* Controls */}
                       <div className="flex items-center gap-0.5 border-l border-[var(--paper-border)] pl-2">
                         <button
-                          onClick={() => setEditingId(editingId === r.id ? null : r.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingId(editingId === r.id ? null : r.id);
+                          }}
                           className={`p-1 rounded transition-colors ${
                             editingId === r.id
                               ? 'text-[var(--paper-accent)]'

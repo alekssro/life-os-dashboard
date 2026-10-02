@@ -2,19 +2,21 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parseFlexibleDate } from '@/lib/date';
 
 export async function GET() {
-  const startOfYesterday = new Date();
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  // Up Next shows today and later only, capped so the widget stays scannable.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
 
   const events = await prisma.scheduleEvent.findMany({
     where: {
       date: {
-        gte: startOfYesterday,
+        gte: startOfToday,
       },
     },
     orderBy: { date: 'asc' },
-    take: 15,
+    take: 10,
     include: {
       domain: true,
       calendar: true,
@@ -26,12 +28,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+
+    const eventDate = data.date ? parseFlexibleDate(data.date) : new Date();
+    if (data.date && !eventDate) {
+      return NextResponse.json({ error: 'Invalid date. Use dd/mm/yyyy.' }, { status: 400 });
+    }
+
     const event = await prisma.scheduleEvent.create({
       data: {
         title: data.title,
         startTime: data.startTime,
         endTime: data.endTime,
-        date: data.date ? new Date(data.date) : new Date(),
+        date: eventDate ?? new Date(),
         location: data.location,
         notes: data.notes,
         domainId: data.domainId || null,

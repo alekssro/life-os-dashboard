@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parseFlexibleDate } from '@/lib/date';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -29,6 +30,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
+
+    const targetDate = parseFlexibleDate(data.targetDate);
+    if (data.targetDate && !targetDate) {
+      return NextResponse.json({ error: 'Invalid target date. Use dd/mm/yyyy.' }, { status: 400 });
+    }
+
     const project = await prisma.project.create({
       data: {
         title: data.title,
@@ -36,7 +43,7 @@ export async function POST(req: NextRequest) {
         description: data.description,
         type: data.type || 'MILESTONE',
         status: data.status || 'ACTIVE',
-        targetDate: data.targetDate ? new Date(data.targetDate) : null,
+        targetDate,
         monthlyBudgetHours: data.monthlyBudgetHours ? parseFloat(data.monthlyBudgetHours) : null,
         domainId: data.domainId || null,
       },
@@ -57,7 +64,11 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
     if (data.targetDate) {
-      data.targetDate = new Date(data.targetDate);
+      const parsedTargetDate = parseFlexibleDate(data.targetDate);
+      if (!parsedTargetDate) {
+        return NextResponse.json({ error: 'Invalid target date. Use dd/mm/yyyy.' }, { status: 400 });
+      }
+      data.targetDate = parsedTargetDate;
     }
 
     const updated = await prisma.project.update({
