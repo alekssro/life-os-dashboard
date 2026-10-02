@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sidebar, NavItem } from '@/components/Sidebar';
+import { Sidebar } from '@/components/Sidebar';
+import { BottomNav } from '@/components/BottomNav';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TasksView } from '@/components/views/TasksView';
 import { RoutinesView } from '@/components/views/RoutinesView';
@@ -13,7 +14,7 @@ import { CaptureModal } from '@/components/CaptureModal';
 import { SettingsModal } from '@/components/SettingsModal';
 
 export default function HomePage() {
-  const [currentView, setCurrentView] = useState<NavItem>('today');
+  const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'projects' | 'people' | 'library' | 'domains'>('today');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -50,19 +51,21 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen bg-[var(--paper-bg)] text-[var(--paper-text)]">
-      {/* Collapsible Sidebar */}
-      <Sidebar
-        currentView={currentView}
-        onSelectView={(v) => setCurrentView(v)}
-        onOpenCapture={() => setIsCaptureOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
-        slippingCount={slippingCount}
-      />
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex lg:flex-col justify-between border-r border-[var(--paper-border)] bg-[var(--paper-card)] select-none transition-all duration-150 w-56 px-4 py-6 h-screen sticky top-0">
+        <Sidebar
+          currentView={currentView}
+          onSelectView={(v) => setCurrentView(v)}
+          onOpenCapture={() => setIsCaptureOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+          slippingCount={slippingCount}
+        />
+      </aside>
 
       {/* Main View Area */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto lg:pb-0 pb-20">
         {currentView === 'today' && (
           <TodayDashboard
             key={refreshKey}
@@ -77,6 +80,13 @@ export default function HomePage() {
         {currentView === 'library' && <LibraryView key={refreshKey} />}
         {currentView === 'domains' && <DomainsView key={refreshKey} />}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav
+        currentView={currentView}
+        onSelectView={(v) => setCurrentView(v)}
+        slippingCount={slippingCount}
+      />
 
       {/* Modals */}
       <CaptureModal

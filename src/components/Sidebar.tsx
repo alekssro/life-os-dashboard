@@ -70,10 +70,7 @@ export function Sidebar({
   };
 
   return (
-    <aside
-      className={`relative flex flex-col justify-between border-r border-[var(--paper-border)] bg-[var(--paper-card)] select-none transition-all duration-150 ${isCollapsed ? 'w-16 px-2' : 'w-56 px-4'
-        } py-6 h-screen sticky top-0`}
-    >
+    <div className="flex flex-col justify-between h-full">
       <div>
         {/* Header / Brand */}
         <div className="flex items-center justify-between mb-8 px-2">
@@ -190,6 +187,6 @@ export function Sidebar({
           {!isCollapsed && <span>Settings & API</span>}
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
