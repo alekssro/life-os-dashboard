@@ -5,6 +5,11 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Life OS | Personal Operations Dashboard',
   description: 'Personal Operations Dashboard, built for desktop, mobile, and e-paper tablets.',
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
