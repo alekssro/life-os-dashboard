@@ -17,6 +17,7 @@ import {
   Sun,
   Tablet,
   Users,
+  ClipboardList,
 } from 'lucide-react';
 import React from 'react';
 
@@ -27,7 +28,8 @@ export type NavItem =
   | 'projects'
   | 'people'
   | 'library'
-  | 'domains';
+  | 'domains'
+  | 'weekly-review';
 
 interface SidebarProps {
   currentView: NavItem;
@@ -58,6 +60,7 @@ export function Sidebar({
     { id: 'people' as NavItem, label: 'People', icon: Users },
     { id: 'library' as NavItem, label: 'Library', icon: BookOpen },
     { id: 'domains' as NavItem, label: 'Domains', icon: Layers },
+    { id: 'weekly-review' as NavItem, label: 'Weekly Review', icon: ClipboardList },
   ];
 
   const getThemeIcon = (t: ThemeType) => {

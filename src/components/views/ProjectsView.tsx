@@ -248,7 +248,8 @@ export function ProjectsView() {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </div              </div>
+                </div>
+              </div>
 
               {/* Inline edit panel */}
               {editingProjectId === project.id && (

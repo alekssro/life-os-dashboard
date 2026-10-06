@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma';
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const resurface = searchParams.get('resurface');
+  const since = searchParams.get('since');
+  const limit = searchParams.get('limit');
 
   if (resurface === 'true') {
     // Pick one item that hasn't been resurfaced recently, or random
@@ -28,8 +30,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(item);
   }
 
+  const where: any = {};
+  if (since) {
+    where.createdAt = {
+      gte: new Date(since),
+    };
+  }
+
   const items = await prisma.libraryItem.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
+    take: limit ? parseInt(limit) : undefined,
   });
   return NextResponse.json(items);
 }

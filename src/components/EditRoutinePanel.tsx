@@ -65,18 +65,6 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
   const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
   const [graceDays, setGraceDays] = useState(routine.graceDays ?? 1);
   const [targetPerWeek, setTargetPerWeek] = useState(routine.targetPerWeek ?? 7);
-  const [title, setTitle] = useState(routine.title);
-  const [icon, setIcon] = useState(routine.icon || '✨');
-  const [timeOfDay, setTimeOfDay] = useState(routine.timeOfDay);
-  const [frequency, setFrequency] = useState(routine.frequency || 'DAILY');
-  const [selectedDays, setSelectedDays] = useState<number[]>(() => {
-    try {
-      return JSON.parse(routine.daysOfWeek || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
 
   const toggleDay = (d: number) =>
     setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));

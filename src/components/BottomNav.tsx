@@ -4,6 +4,7 @@ import { ThemeType, useTheme } from '@/lib/theme';
 import {
   BookOpen,
   CheckSquare,
+  ClipboardList,
   Coffee,
   Flame,
   FolderKanban,
@@ -24,7 +25,8 @@ export type NavItem =
   | 'projects'
   | 'people'
   | 'library'
-  | 'domains';
+  | 'domains'
+  | 'weekly-review';
 
 interface BottomNavProps {
   currentView: NavItem;
@@ -47,6 +49,7 @@ export function BottomNav({
     { id: 'people' as NavItem, label: 'People', icon: Users },
     { id: 'library' as NavItem, label: 'Library', icon: BookOpen },
     { id: 'domains' as NavItem, label: 'Domains', icon: Layers },
+    { id: 'weekly-review' as NavItem, label: 'Weekly', icon: ClipboardList },
   ];
 
   const getThemeIcon = (t: ThemeType) => {

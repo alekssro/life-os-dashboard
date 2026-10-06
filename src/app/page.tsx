@@ -10,11 +10,12 @@ import { ProjectsView } from '@/components/views/ProjectsView';
 import { PeopleView } from '@/components/views/PeopleView';
 import { LibraryView } from '@/components/views/LibraryView';
 import { DomainsView } from '@/components/views/DomainsView';
+import { WeeklyReviewView } from '@/components/views/WeeklyReviewView';
 import { CaptureModal } from '@/components/CaptureModal';
 import { SettingsModal } from '@/components/SettingsModal';
 
 export default function HomePage() {
-  const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'projects' | 'people' | 'library' | 'domains'>('today');
+  const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'projects' | 'people' | 'library' | 'domains' | 'weekly-review'>('today');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -79,6 +80,7 @@ export default function HomePage() {
         {currentView === 'people' && <PeopleView key={refreshKey} />}
         {currentView === 'library' && <LibraryView key={refreshKey} />}
         {currentView === 'domains' && <DomainsView key={refreshKey} />}
+        {currentView === 'weekly-review' && <WeeklyReviewView key={refreshKey} />}
       </main>
 
       {/* Mobile Bottom Navigation */}

@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   const isTop3 = searchParams.get('isTop3');
   const domainId = searchParams.get('domainId');
+  const since = searchParams.get('since');
 
   const where: any = {};
   if (status) {
@@ -17,6 +18,11 @@ export async function GET(req: NextRequest) {
   }
   if (domainId) {
     where.domainId = domainId;
+  }
+  if (since) {
+    where.completedAt = {
+      gte: new Date(since),
+    };
   }
 
   const tasks = await prisma.task.findMany({
