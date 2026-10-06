@@ -596,40 +596,146 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
         {/* RIGHT RAIL COLUMN (5 cols) */}
         <div className="lg:col-span-5 space-y-8">
-          {/* 1. SLIPPING (Attention Engine) */}
+          {/* 1. ATTENTION ENGINE - Project Health */}
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-mono font-semibold tracking-wider uppercase text-[var(--paper-muted)]">
-                Slipping
+                Attention
               </h2>
             </div>
 
-            {attention?.slippingProjects?.length > 0 ? (
-              <div className="space-y-2">
-                {attention.slippingProjects.map((p: any) => (
-                  <div
-                    key={p.id}
-                    className="p-3 rounded border border-[var(--paper-accent)]/40 bg-[var(--paper-card-subtle)]"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-[var(--paper-text)]">{p.title}</p>
-                      <span className="text-[10px] font-mono text-[var(--paper-accent)] uppercase font-semibold">
-                        Quiet {p.daysInactive}d
-                      </span>
-                    </div>
-                    {p.domainName && (
-                      <p className="text-[10px] font-mono text-[var(--paper-muted)] mt-1 uppercase">
-                        Domain: {p.domainName}
-                      </p>
-                    )}
+            <div className="space-y-3">
+              {/* At Risk - Overdue tasks */}
+              {attention?.atRiskProjects?.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-mono uppercase text-red-500 tracking-wider mb-1.5">
+                    At Risk
+                  </h3>
+                  <div className="space-y-2">
+                    {attention.atRiskProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="p-3 rounded border border-red-500/40 bg-red-500/10"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[var(--paper-text)]">{p.title}</p>
+                          <span className="text-[10px] font-mono text-red-500 uppercase font-semibold">
+                            {p.overdueTaskCount} overdue
+                          </span>
+                        </div>
+                        {p.domainName && (
+                          <p className="text-[10px] font-mono text-[var(--paper-muted)] mt-1 uppercase">
+                            Domain: {p.domainName}
+                          </p>
+                        )}
+                        {p.waitingOn && (
+                          <p className="text-[10px] font-mono text-yellow-500 mt-1">
+                            Waiting on: {p.waitingOn}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--paper-muted)] leading-relaxed font-serif">
-                Nothing slipping right now. Projects that go quiet — or miss patterns set on their domain — will surface here.
-              </p>
-            )}
+                </div>
+              )}
+
+              {/* Waiting on external */}
+              {attention?.waitingProjects?.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-mono uppercase text-yellow-500 tracking-wider mb-1.5">
+                    Waiting
+                  </h3>
+                  <div className="space-y-2">
+                    {attention.waitingProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="p-3 rounded border border-yellow-500/40 bg-yellow-500/10"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[var(--paper-text)]">{p.title}</p>
+                          <span className="text-[10px] font-mono text-yellow-500 uppercase font-semibold">
+                            Waiting
+                          </span>
+                        </div>
+                        {p.domainName && (
+                          <p className="text-[10px] font-mono text-[var(--paper-muted)] mt-1 uppercase">
+                            Domain: {p.domainName}
+                          </p>
+                        )}
+                        {p.waitingOn && (
+                          <p className="text-[10px] font-mono text-[var(--paper-text)] mt-1">
+                            Waiting on: {p.waitingOn}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quiet / Slipping */}
+              {attention?.quietProjects?.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-mono uppercase text-gray-500 tracking-wider mb-1.5">
+                    Quiet
+                  </h3>
+                  <div className="space-y-2">
+                    {attention.quietProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="p-3 rounded border border-gray-500/40 bg-gray-500/10"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[var(--paper-text)]">{p.title}</p>
+                          <span className="text-[10px] font-mono text-gray-500 uppercase font-semibold">
+                            Quiet {p.daysInactive}d
+                          </span>
+                        </div>
+                        {p.domainName && (
+                          <p className="text-[10px] font-mono text-[var(--paper-muted)] mt-1 uppercase">
+                            Domain: {p.domainName}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {attention?.slippingProjects?.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-mono uppercase text-[var(--paper-accent)] tracking-wider mb-1.5">
+                    Slipping (Legacy)
+                  </h3>
+                  <div className="space-y-2">
+                    {attention.slippingProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="p-3 rounded border border-[var(--paper-accent)]/40 bg-[var(--paper-card-subtle)]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[var(--paper-text)]">{p.title}</p>
+                          <span className="text-[10px] font-mono text-[var(--paper-accent)] uppercase font-semibold">
+                            Quiet {p.daysInactive}d
+                          </span>
+                        </div>
+                        {p.domainName && (
+                          <p className="text-[10px] font-mono text-[var(--paper-muted)] mt-1 uppercase">
+                            Domain: {p.domainName}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!attention?.atRiskProjects?.length && !attention?.waitingProjects?.length && !attention?.quietProjects?.length && !attention?.slippingProjects?.length) && (
+                <p className="text-xs text-[var(--paper-muted)] leading-relaxed font-serif">
+                  Nothing needs attention. Projects that go quiet, have overdue tasks, or are waiting on others will surface here.
+                </p>
+              )}
+            </div>
           </section>
 
           {/* 2. ROUTINES */}

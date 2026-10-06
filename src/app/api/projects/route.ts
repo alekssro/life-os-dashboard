@@ -4,6 +4,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseFlexibleDate } from '@/lib/date';
 
+type ProjectHealth = 'ON_TRACK' | 'WAITING' | 'QUIET' | 'AT_RISK' | 'COMPLETED';
+
+function computeProjectHealth(project: any, tasks: any[], domainSlippingThreshold?: number): ProjectHealth {
+  if (project.status === 'COMPLETED' || project.status === 'ARCHIVED') {
+    return 'COMPLETED';
+  }
+
+  const now = new Date();
+  const overdueTasks = tasks.filter(
+    (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE'
+  );
+  const waitingTasks = tasks.filter((t) => t.status === 'WAITING');
+  const daysSinceActivity = Math.floor(
+    (now.getTime() - new Date(project.lastActivityAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const threshold = domainSlippingThreshold ?? 14;
+
+  if (overdueTasks.length > 0) return 'AT_RISK';
+  if (waitingTasks.length > 0) return 'WAITING';
+  if (daysSinceActivity > threshold) return 'QUIET';
+  return 'ON_TRACK';
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
@@ -18,13 +41,18 @@ export async function GET(req: NextRequest) {
     include: {
       domain: true,
       tasks: {
-        where: { status: { in: ['TODO', 'IN_PROGRESS'] } },
+        where: { status: { in: ['TODO', 'IN_PROGRESS', 'WAITING'] } },
       },
     },
     orderBy: { lastActivityAt: 'desc' },
   });
 
-  return NextResponse.json(projects);
+  const projectsWithHealth = projects.map((p) => ({
+    ...p,
+    health: computeProjectHealth(p, p.tasks, p.domain?.slippingThresholdDays ?? undefined),
+  }));
+
+  return NextResponse.json(projectsWithHealth);
 }
 
 export async function POST(req: NextRequest) {
@@ -46,12 +74,22 @@ export async function POST(req: NextRequest) {
         targetDate,
         monthlyBudgetHours: data.monthlyBudgetHours ? parseFloat(data.monthlyBudgetHours) : null,
         domainId: data.domainId || null,
+        waitingOn: data.waitingOn || null,
       },
       include: {
         domain: true,
+        tasks: {
+          where: { status: { in: ['TODO', 'IN_PROGRESS', 'WAITING'] } },
+        },
       },
     });
-    return NextResponse.json(project, { status: 201 });
+
+    const projectWithHealth = {
+      ...project,
+      health: computeProjectHealth(project, project.tasks, project.domain?.slippingThresholdDays ?? undefined),
+    };
+
+    return NextResponse.json(projectWithHealth, { status: 201 });
   } catch (error) {
     console.error('Error creating project:', error);
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
@@ -79,9 +117,18 @@ export async function PATCH(req: NextRequest) {
       },
       include: {
         domain: true,
+        tasks: {
+          where: { status: { in: ['TODO', 'IN_PROGRESS', 'WAITING'] } },
+        },
       },
     });
-    return NextResponse.json(updated);
+
+    const projectWithHealth = {
+      ...updated,
+      health: computeProjectHealth(updated, updated.tasks, updated.domain?.slippingThresholdDays ?? undefined),
+    };
+
+    return NextResponse.json(projectWithHealth);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
@@ -93,7 +140,6 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing project id' }, { status: 400 });
 
-    // Unlink tasks or cascade
     await prisma.task.updateMany({
       where: { projectId: id },
       data: { projectId: null },
@@ -106,4 +152,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
   }
 }
-

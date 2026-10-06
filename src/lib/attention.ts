@@ -7,6 +7,28 @@ export interface AttentionReport {
     domainName?: string;
     daysInactive: number;
     lastActivityAt: Date;
+    health: string;
+    waitingOn?: string | null;
+  }>;
+  atRiskProjects: Array<{
+    id: string;
+    title: string;
+    domainName?: string;
+    overdueTaskCount: number;
+    waitingOn?: string | null;
+  }>;
+  waitingProjects: Array<{
+    id: string;
+    title: string;
+    domainName?: string;
+    waitingOn?: string | null;
+  }>;
+  quietProjects: Array<{
+    id: string;
+    title: string;
+    domainName?: string;
+    daysInactive: number;
+    lastActivityAt: Date;
   }>;
   slippingContacts: Array<{
     id: string;
@@ -28,36 +50,83 @@ export interface AttentionReport {
 
 export async function getAttentionReport(): Promise<AttentionReport> {
   const now = new Date();
-  const slippingDaysThreshold = 14;
-  const projectCutoff = new Date(now.getTime() - slippingDaysThreshold * 24 * 60 * 60 * 1000);
+  const defaultThreshold = 14;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
-  // 1. Projects with no activity in 14+ days
+  // Fetch all active projects with domain and tasks
   const activeProjects = await prisma.project.findMany({
     where: {
       status: 'ACTIVE',
-      lastActivityAt: {
-        lt: projectCutoff,
-      },
     },
     include: {
       domain: true,
+      tasks: {
+        where: { status: { in: ['TODO', 'IN_PROGRESS', 'WAITING'] } },
+      },
     },
     orderBy: {
       lastActivityAt: 'asc',
     },
   });
 
-  const slippingProjects = activeProjects.map((p) => {
-    const diffMs = now.getTime() - new Date(p.lastActivityAt).getTime();
-    const daysInactive = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    return {
-      id: p.id,
-      title: p.title,
-      domainName: p.domain?.name,
-      daysInactive,
-      lastActivityAt: p.lastActivityAt,
-    };
-  });
+  const slippingProjects: AttentionReport['slippingProjects'] = [];
+  const atRiskProjects: AttentionReport['atRiskProjects'] = [];
+  const waitingProjects: AttentionReport['waitingProjects'] = [];
+  const quietProjects: AttentionReport['quietProjects'] = [];
+
+  for (const p of activeProjects) {
+    const threshold = p.domain?.slippingThresholdDays ?? defaultThreshold;
+    const daysSinceActivity = Math.floor(
+      (now.getTime() - new Date(p.lastActivityAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    const overdueTasks = p.tasks.filter(
+      (t) => t.dueDate && new Date(t.dueDate) < todayStart && t.status !== 'DONE'
+    );
+    const waitingTasks = p.tasks.filter((t) => t.status === 'WAITING');
+
+    let health = 'ON_TRACK';
+    if (overdueTasks.length > 0) health = 'AT_RISK';
+    else if (waitingTasks.length > 0) health = 'WAITING';
+    else if (daysSinceActivity > threshold) health = 'QUIET';
+
+    if (health === 'AT_RISK') {
+      atRiskProjects.push({
+        id: p.id,
+        title: p.title,
+        domainName: p.domain?.name,
+        overdueTaskCount: overdueTasks.length,
+        waitingOn: p.waitingOn,
+      });
+    } else if (health === 'WAITING') {
+      waitingProjects.push({
+        id: p.id,
+        title: p.title,
+        domainName: p.domain?.name,
+        waitingOn: p.waitingOn,
+      });
+    } else if (health === 'QUIET') {
+      quietProjects.push({
+        id: p.id,
+        title: p.title,
+        domainName: p.domain?.name,
+        daysInactive: daysSinceActivity,
+        lastActivityAt: p.lastActivityAt,
+      });
+    } else if (daysSinceActivity > threshold) {
+      // Also include in slipping for backward compatibility
+      slippingProjects.push({
+        id: p.id,
+        title: p.title,
+        domainName: p.domain?.name,
+        daysInactive: daysSinceActivity,
+        lastActivityAt: p.lastActivityAt,
+        health: 'QUIET',
+        waitingOn: p.waitingOn,
+      });
+    }
+  }
 
   // 2. Contacts needing follow-up
   const allContacts = await prisma.crmContact.findMany({
@@ -84,9 +153,6 @@ export async function getAttentionReport(): Promise<AttentionReport> {
     });
 
   // 3. Overdue Tasks
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
   const overdue = await prisma.task.findMany({
     where: {
       status: {
@@ -124,6 +190,9 @@ export async function getAttentionReport(): Promise<AttentionReport> {
 
   return {
     slippingProjects,
+    atRiskProjects,
+    waitingProjects,
+    quietProjects,
     slippingContacts,
     overdueTasks,
     needsReviewInboxCount,

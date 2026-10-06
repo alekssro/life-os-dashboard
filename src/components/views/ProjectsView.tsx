@@ -1,8 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FolderKanban, Clock, AlertTriangle, Plus, CheckCircle2, Trash2 } from 'lucide-react';
+import { FolderKanban, Clock, AlertTriangle, Plus, CheckCircle2, Trash2, Hourglass, PauseCircle, Activity } from 'lucide-react';
 import { formatDateDDMMYYYY } from '@/lib/date';
+
+const HEALTH_COLORS = {
+  ON_TRACK: { bg: 'bg-green-500/20', border: 'border-green-500/40', text: 'text-green-500', icon: Activity },
+  WAITING: { bg: 'bg-yellow-500/20', border: 'border-yellow-500/40', text: 'text-yellow-500', icon: PauseCircle },
+  QUIET: { bg: 'bg-gray-500/20', border: 'border-gray-500/40', text: 'text-gray-500', icon: Hourglass },
+  AT_RISK: { bg: 'bg-red-500/20', border: 'border-red-500/40', text: 'text-red-500', icon: AlertTriangle },
+  COMPLETED: { bg: 'bg-blue-500/20', border: 'border-blue-500/40', text: 'text-blue-500', icon: CheckCircle2 },
+};
+
+const HEALTH_LABELS = {
+  ON_TRACK: 'On Track',
+  WAITING: 'Waiting',
+  QUIET: 'Quiet',
+  AT_RISK: 'At Risk',
+  COMPLETED: 'Completed',
+};
 
 export function ProjectsView() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -11,6 +27,9 @@ export function ProjectsView() {
   const [newType, setNewType] = useState('MILESTONE');
   const [newDomainId, setNewDomainId] = useState('');
   const [newMonthlyBudget, setNewMonthlyBudget] = useState('');
+  const [newWaitingOn, setNewWaitingOn] = useState('');
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editWaitingOn, setEditWaitingOn] = useState('');
 
   const loadProjects = async () => {
     const [pRes, dRes] = await Promise.all([
@@ -37,11 +56,23 @@ export function ProjectsView() {
         type: newType,
         domainId: newDomainId || null,
         monthlyBudgetHours: newMonthlyBudget || null,
+        waitingOn: newWaitingOn || null,
       }),
     });
 
     setNewTitle('');
     setNewMonthlyBudget('');
+    setNewWaitingOn('');
+    loadProjects();
+  };
+
+  const handleSaveEdit = async (id: string, updates: any) => {
+    await fetch('/api/projects', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    });
+    setEditingProjectId(null);
     loadProjects();
   };
 
@@ -51,11 +82,14 @@ export function ProjectsView() {
     await fetch(`/api/projects?id=${id}`, { method: 'DELETE' });
   };
 
-  const isSlipping = (lastActivity: string) => {
-    const days = Math.floor(
-      (new Date().getTime() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return days >= 14 ? days : null;
+  const getHealthIcon = (health: string) => {
+    const config = HEALTH_COLORS[health as keyof typeof HEALTH_COLORS] || HEALTH_COLORS.ON_TRACK;
+    return config.icon;
+  };
+
+  const getHealthStyle = (health: string) => {
+    const config = HEALTH_COLORS[health as keyof typeof HEALTH_COLORS] || HEALTH_COLORS.ON_TRACK;
+    return config;
   };
 
   return (
@@ -106,6 +140,13 @@ export function ProjectsView() {
             className="w-32 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] placeholder-[var(--paper-muted)] px-3 py-1.5 rounded border border-[var(--paper-border)] text-xs font-mono"
           />
         )}
+        <input
+          type="text"
+          value={newWaitingOn}
+          onChange={(e) => setNewWaitingOn(e.target.value)}
+          placeholder="Waiting on... (client, vendor, approval)"
+          className="flex-1 min-w-[180px] bg-[var(--paper-card-subtle)] text-[var(--paper-text)] placeholder-[var(--paper-muted)] px-3 py-1.5 rounded border border-[var(--paper-border)] text-xs font-mono"
+        />
         <button
           type="submit"
           className="px-4 py-1.5 rounded bg-[var(--paper-accent)] text-white font-mono text-xs flex items-center gap-1.5"
@@ -118,29 +159,45 @@ export function ProjectsView() {
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {projects.map((project) => {
-          const slippingDays = isSlipping(project.lastActivityAt);
+          const health = project.health || 'ON_TRACK';
+          const healthStyle = getHealthStyle(health);
+          const HealthIcon = getHealthIcon(health);
+
           return (
             <div
               key={project.id}
-              className={`p-4 rounded border bg-[var(--paper-card)] flex flex-col justify-between transition-colors ${
-                slippingDays
-                  ? 'border-[var(--paper-accent)]/60 bg-[var(--paper-highlight)]/30'
-                  : 'border-[var(--paper-border)]'
-              }`}
+              onClick={() => setEditingProjectId(editingProjectId === project.id ? null : project.id)}
+              className={`p-4 rounded border bg-[var(--paper-card)] flex flex-col justify-between transition-colors cursor-pointer ${
+                editingProjectId === project.id
+                  ? 'border-[var(--paper-accent)] ring-1 ring-[var(--paper-accent)]'
+                  : healthStyle.border + ' hover:border-[var(--paper-border-strong)]'
+              } ${healthStyle.bg}`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold text-base text-[var(--paper-text)]">
                     {project.title}
                   </h3>
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-[var(--paper-border)] text-[var(--paper-muted)]">
-                    {project.type.replace('_', ' ')}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <HealthIcon className={`w-3 h-3 ${healthStyle.text}`} />
+                    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border ${healthStyle.border} ${healthStyle.text} font-semibold`}>
+                      {HEALTH_LABELS[health as keyof typeof HEALTH_LABELS]}
+                    </span>
+                    <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-[var(--paper-border)] text-[var(--paper-muted)]">
+                      {project.type.replace('_', ' ')}
+                    </span>
+                  </div>
                 </div>
 
                 {project.domain && (
                   <p className="text-xs font-mono text-[var(--paper-tag)] uppercase mb-3">
                     ● {project.domain.name}
+                  </p>
+                )}
+
+                {project.waitingOn && health === 'WAITING' && (
+                  <p className="text-xs text-[var(--paper-muted)] italic mb-2">
+                    Waiting on: {project.waitingOn}
                   </p>
                 )}
 
@@ -161,17 +218,17 @@ export function ProjectsView() {
 
               {/* Footer */}
               <div className="pt-4 mt-3 border-t border-[var(--paper-border)] flex items-center justify-between text-xs font-mono">
-                {slippingDays ? (
-                  <span className="flex items-center gap-1 text-[var(--paper-accent)] font-semibold">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Inactive {slippingDays} days (Slipping)
+                <div className="flex items-center gap-1">
+                  <span className={`flex items-center gap-1 ${healthStyle.text} font-semibold`}>
+                    <HealthIcon className="w-3.5 h-3.5" />
+                    {HEALTH_LABELS[health as keyof typeof HEALTH_LABELS]}
                   </span>
-                ) : (
-                  <span className="text-[var(--paper-muted)] flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    Active
-                  </span>
-                )}
+                  {project.lastActivityAt && (
+                    <span className="text-[10px] text-[var(--paper-muted)]">
+                      ({formatDateDDMMYYYY(project.lastActivityAt)})
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {project.targetDate && (
                     <span className="text-[10px] text-[var(--paper-muted)]">
@@ -182,14 +239,46 @@ export function ProjectsView() {
                     {project.status}
                   </span>
                   <button
-                    onClick={() => handleDeleteProject(project.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteProject(project.id);
+                    }}
                     className="p-1 rounded text-[var(--paper-muted)] hover:text-red-500 transition-colors ml-1"
                     title="Delete project"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                </div              </div>
+
+              {/* Inline edit panel */}
+              {editingProjectId === project.id && (
+                <div className="mt-3 pt-3 border-t border-[var(--paper-border)] space-y-2">
+                  <div>
+                    <label className="text-xs font-mono text-[var(--paper-muted)]">Waiting on:</label>
+                    <input
+                      type="text"
+                      value={editWaitingOn}
+                      onChange={(e) => setEditWaitingOn(e.target.value)}
+                      placeholder="Client, vendor, approval..."
+                      className="w-full mt-1 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setEditingProjectId(null)}
+                      className="px-2 py-1 text-xs text-[var(--paper-muted)] hover:text-[var(--paper-text)]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(project.id, { waitingOn: editWaitingOn || null })}
+                      className="px-2 py-1 text-xs bg-[var(--paper-accent)] text-white rounded font-mono"
+                    >
+                      Save
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           );
         })}
