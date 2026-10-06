@@ -27,6 +27,8 @@ export function RoutinesView() {
   const [newFrequency, setNewFrequency] = useState('DAILY');
   const [newSelectedDays, setNewSelectedDays] = useState<number[]>([]);
   const [newDayOfMonth, setNewDayOfMonth] = useState('1');
+  const [newGraceDays, setNewGraceDays] = useState(1);
+  const [newTargetPerWeek, setNewTargetPerWeek] = useState(7);
 
   const loadRoutines = async () => {
     const res = await fetch('/api/routines');
@@ -51,12 +53,16 @@ export function RoutinesView() {
         frequency: newFrequency,
         daysOfWeek: newFrequency === 'WEEKLY' ? JSON.stringify(newSelectedDays) : undefined,
         dayOfMonth: newFrequency === 'MONTHLY' ? newDayOfMonth : undefined,
+        graceDays: newGraceDays,
+        targetPerWeek: newTargetPerWeek,
       }),
     });
 
     setNewTitle('');
     setNewFrequency('DAILY');
     setNewSelectedDays([]);
+    setNewGraceDays(1);
+    setNewTargetPerWeek(7);
     loadRoutines();
   };
 
@@ -197,6 +203,34 @@ export function RoutinesView() {
             />
           </div>
         )}
+
+        {/* Consistency settings */}
+        <div className="flex flex-wrap gap-4 pl-1 pt-2 border-t border-[var(--paper-border)]">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-[var(--paper-muted)]">Grace days:</label>
+            <input
+              type="number"
+              min={0}
+              max={7}
+              value={newGraceDays}
+              onChange={(e) => setNewGraceDays(parseInt(e.target.value) || 0)}
+              className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
+              title="Days allowed to log after due date without penalty"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-[var(--paper-muted)]">Target/week:</label>
+            <input
+              type="number"
+              min={1}
+              max={7}
+              value={newTargetPerWeek}
+              onChange={(e) => setNewTargetPerWeek(parseInt(e.target.value) || 1)}
+              className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
+              title="Expected completions per week for consistency scoring"
+            />
+          </div>
+        </div>
       </form>
 
       {/* Routine Sections */}
@@ -273,10 +307,13 @@ export function RoutinesView() {
                     </div>
 
                     <div className="flex items-center gap-3 text-xs font-mono shrink-0">
-                      {r.isDueToday && (
-                        <span className="flex items-center gap-1 text-[var(--paper-accent)] font-semibold">
-                          <Flame className="w-4 h-4 fill-current" />
-                          {r.streak}
+                      <span className={`flex items-center gap-1 ${r.consistencyScore >= 80 ? 'text-green-500' : r.consistencyScore >= 50 ? 'text-yellow-500' : 'text-[var(--paper-accent)]'} font-semibold`}>
+                        <Flame className="w-4 h-4 fill-current" />
+                        {r.consistencyScore}%
+                      </span>
+                      {r.isDueToday && r.streak > 0 && (
+                        <span className="flex items-center gap-1 text-[var(--paper-muted)]" title="Current streak">
+                          {r.streak}🔥
                         </span>
                       )}
 

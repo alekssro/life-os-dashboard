@@ -123,3 +123,26 @@ export function formatTimeHHMM(date: Date | string | null | undefined): string {
   if (isNaN(d.getTime())) return '';
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Start of current week (Monday) as Date at 00:00:00 local. */
+export function getWeekStart(date: Date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+/** End of current week (Sunday) as Date at 23:59:59 local. */
+export function getWeekEnd(date: Date = new Date()): Date {
+  const d = getWeekStart(date);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+/** Local calendar date as YYYY-MM-DD string. */
+export function formatDateYYYYMMDD(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

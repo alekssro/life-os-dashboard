@@ -128,30 +128,33 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
     });
   };
 
-  // Routine action
-  const toggleRoutine = async (routineId: string, currentCompleted: boolean) => {
+// Routine action with backdating support
+  const toggleRoutine = async (routineId: string, currentCompleted: boolean, logDate?: string) => {
     const nextVal = !currentCompleted;
+    const targetDate = logDate || todayISOStr;
+    
     setRoutinesData((prev) => ({
       ...prev,
       routines: prev.routines.map((r) =>
         r.id === routineId
           ? {
-            ...r,
-            isCompletedToday: nextVal,
-            streak: nextVal ? r.streak + 1 : Math.max(0, r.streak - 1),
-          }
+              ...r,
+              isCompletedToday: targetDate === todayISOStr ? nextVal : r.isCompletedToday,
+              consistencyScore: nextVal ? Math.min(100, r.consistencyScore + 10) : Math.max(0, r.consistencyScore - 10),
+            }
           : r
       ),
-      completedCount: nextVal ? prev.completedCount + 1 : Math.max(0, prev.completedCount - 1),
+      completedCount: targetDate === todayISOStr 
+        ? (nextVal ? prev.completedCount + 1 : Math.max(0, prev.completedCount - 1))
+        : prev.completedCount,
     }));
 
     const res = await fetch('/api/routines', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ routineId, completed: nextVal }),
+      body: JSON.stringify({ routineId, completed: nextVal, date: targetDate }),
     });
 
-    // e.g. routine no longer scheduled for today — fall back to server truth
     if (!res.ok) loadData();
   };
 
@@ -207,6 +210,13 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
     <div key={r.id}>
       <div
         onClick={() => setEditingRoutineId(editingRoutineId === r.id ? null : r.id)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Right-click to log for yesterday
+          const yesterday = new Date(now);
+          yesterday.setDate(yesterday.getDate() - 1);
+          toggleRoutine(r.id, r.isCompletedToday, toISODate(yesterday));
+        }}
         className={`flex items-center justify-between p-2 rounded cursor-pointer text-xs ${
           editingRoutineId === r.id
             ? 'bg-[var(--paper-card-subtle)] ring-1 ring-[var(--paper-accent)]'
@@ -239,12 +249,17 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             {r.title}
           </span>
         </div>
-        {r.streak > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-accent)]">
+        <div className="flex items-center gap-2">
+          <span className={`flex items-center gap-0.5 text-[10px] font-mono ${r.consistencyScore >= 80 ? 'text-green-500' : r.consistencyScore >= 50 ? 'text-yellow-500' : 'text-[var(--paper-accent)]'}`}>
             <Flame className="w-3 h-3 fill-current" />
-            {r.streak}
+            {r.consistencyScore}%
           </span>
-        )}
+          {r.streak > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] font-mono text-[var(--paper-muted)]" title="Current streak">
+              {r.streak}🔥
+            </span>
+          )}
+        </div>
       </div>
 
       {editingRoutineId === r.id && (

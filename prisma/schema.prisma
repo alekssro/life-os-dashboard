@@ -9,19 +9,21 @@ datasource db {
 }
 
 model Domain {
-  id          String         @id @default(uuid())
-  name        String
-  slug        String         @unique
-  description String?
-  color       String?        @default("#B84A39") // default terracotta accent
-  order       Int            @default(0)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  projects    Project[]
-  tasks       Task[]
-  contacts    CrmContact[]
-  content     ContentItem[]
-  events      ScheduleEvent[]
+  id                       String         @id @default(uuid())
+  name                     String
+  slug                     String         @unique
+  description              String?
+  color                    String?        @default("#B84A39")
+  order                    Int            @default(0)
+  slippingThresholdDays    Int?           @default(14)
+  expectedActivityPerWeek  Int?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  projects                 Project[]
+  tasks                    Task[]
+  contacts                 CrmContact[]
+  content                  ContentItem[]
+  events                   ScheduleEvent[]
 
   @@map("domains")
 }
@@ -32,6 +34,14 @@ enum ProjectStatus {
   ON_HOLD
   COMPLETED
   ARCHIVED
+}
+
+enum ProjectHealth {
+  ON_TRACK
+  WAITING
+  QUIET
+  AT_RISK
+  COMPLETED
 }
 
 enum ProjectType {
@@ -51,6 +61,9 @@ model Project {
   hoursLogged         Float         @default(0)
   monthlyBudgetHours  Float?
   lastActivityAt      DateTime      @default(now())
+  health              ProjectHealth @default(ON_TRACK)
+  healthUpdatedAt     DateTime      @default(now())
+  waitingOn           String?       // What/who we're waiting for
   domainId            String?
   domain              Domain?       @relation(fields: [domainId], references: [id], onDelete: SetNull)
   tasks               Task[]
@@ -60,12 +73,14 @@ model Project {
   @@index([domainId])
   @@index([status])
   @@index([lastActivityAt])
+  @@index([health])
   @@map("projects")
 }
 
 enum TaskStatus {
   TODO
   IN_PROGRESS
+  WAITING
   DONE
   CANCELLED
 }
@@ -162,6 +177,9 @@ model Routine {
   streak            Int              @default(0)
   bestStreak        Int              @default(0)
   lastCompletedDate String?          // YYYY-MM-DD
+  consistencyScore  Float            @default(0)   // 0-100 rolling weekly consistency
+  graceDays         Int              @default(1)   // Missed days allowed before penalty
+  targetPerWeek     Int              @default(7)   // Target completions per week
   logs              RoutineLog[]
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -177,6 +195,7 @@ model RoutineLog {
   date        String   // YYYY-MM-DD
   completed   Boolean  @default(true)
   completedAt DateTime @default(now())
+  loggedAt    DateTime @default(now())  // When user actually logged it (may differ from date)
 
   @@unique([routineId, date])
   @@map("routine_logs")

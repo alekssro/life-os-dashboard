@@ -63,6 +63,20 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
     }
   });
   const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
+  const [graceDays, setGraceDays] = useState(routine.graceDays ?? 1);
+  const [targetPerWeek, setTargetPerWeek] = useState(routine.targetPerWeek ?? 7);
+  const [title, setTitle] = useState(routine.title);
+  const [icon, setIcon] = useState(routine.icon || '✨');
+  const [timeOfDay, setTimeOfDay] = useState(routine.timeOfDay);
+  const [frequency, setFrequency] = useState(routine.frequency || 'DAILY');
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => {
+    try {
+      return JSON.parse(routine.daysOfWeek || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
 
   const toggleDay = (d: number) =>
     setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
@@ -76,6 +90,8 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
       frequency,
       daysOfWeek: frequency === 'WEEKLY' ? JSON.stringify(selectedDays) : null,
       dayOfMonth: frequency === 'MONTHLY' ? dayOfMonth : null,
+      graceDays,
+      targetPerWeek,
     });
   };
 
@@ -164,6 +180,34 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
           />
         </div>
       )}
+
+      {/* Consistency settings */}
+      <div className="flex flex-wrap gap-4 pt-2 border-t border-[var(--paper-border)]">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-mono text-[var(--paper-muted)]">Grace days:</label>
+          <input
+            type="number"
+            min={0}
+            max={7}
+            value={graceDays}
+            onChange={(e) => setGraceDays(parseInt(e.target.value) || 0)}
+            className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
+            title="Days allowed to log after due date without penalty"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-mono text-[var(--paper-muted)]">Target/week:</label>
+          <input
+            type="number"
+            min={1}
+            max={7}
+            value={targetPerWeek}
+            onChange={(e) => setTargetPerWeek(parseInt(e.target.value) || 1)}
+            className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
+            title="Expected completions per week for consistency scoring"
+          />
+        </div>
+      </div>
 
       <div className="flex justify-end gap-2">
         <button
