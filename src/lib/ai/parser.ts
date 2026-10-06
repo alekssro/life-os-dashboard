@@ -36,6 +36,8 @@ Return strictly JSON with the following schema:
 Only output valid JSON. Do not include markdown codeblocks or explanation.
 Dates written by the user are day-first DD/MM/YYYY (e.g. 05/10/2026 = 5 October 2026), but always return due_date as YYYY-MM-DD.`;
 
+const AI_DEBUG = process.env.AI_DEBUG === 'true';
+
 // 1. Local Ollama Provider (Open Source)
 async function parseWithOllama(text: string): Promise<ParsedCapture | null> {
   const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
@@ -53,14 +55,24 @@ async function parseWithOllama(text: string): Promise<ParsedCapture | null> {
       signal: AbortSignal.timeout(12000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (AI_DEBUG) {
+        let body = '';
+        try { body = await res.text(); } catch {}
+        console.error(`[AI] parseWithOllama: HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+      }
+      return null;
+    }
     const data = await res.json();
     const parsed = JSON.parse(data.response);
     return {
       ...parsed,
       provider_used: `ollama (${model})`,
     };
-  } catch {
+  } catch (error) {
+    if (AI_DEBUG) {
+      console.error('[AI] parseWithOllama failed:', error);
+    }
     return null;
   }
 }
@@ -91,7 +103,14 @@ async function parseWithGemini(text: string): Promise<ParsedCapture | null> {
       signal: AbortSignal.timeout(12000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (AI_DEBUG) {
+        let body = '';
+        try { body = await res.text(); } catch {}
+        console.error(`[AI] parseWithGemini: HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+      }
+      return null;
+    }
     const data = await res.json();
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) return null;
@@ -100,7 +119,10 @@ async function parseWithGemini(text: string): Promise<ParsedCapture | null> {
       ...parsed,
       provider_used: `gemini (${model})`,
     };
-  } catch {
+  } catch (error) {
+    if (AI_DEBUG) {
+      console.error('[AI] parseWithGemini failed:', error);
+    }
     return null;
   }
 }
@@ -128,7 +150,14 @@ async function parseWithClaude(text: string): Promise<ParsedCapture | null> {
       signal: AbortSignal.timeout(12000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (AI_DEBUG) {
+        let body = '';
+        try { body = await res.text(); } catch {}
+        console.error(`[AI] parseWithClaude: HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+      }
+      return null;
+    }
     const data = await res.json();
     const content = data.content?.[0]?.text;
     if (!content) return null;
@@ -139,7 +168,10 @@ async function parseWithClaude(text: string): Promise<ParsedCapture | null> {
       ...parsed,
       provider_used: `claude (${model})`,
     };
-  } catch {
+  } catch (error) {
+    if (AI_DEBUG) {
+      console.error('[AI] parseWithClaude failed:', error);
+    }
     return null;
   }
 }
@@ -168,7 +200,14 @@ async function parseWithOpenAI(text: string): Promise<ParsedCapture | null> {
       signal: AbortSignal.timeout(12000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (AI_DEBUG) {
+        let body = '';
+        try { body = await res.text(); } catch {}
+        console.error(`[AI] parseWithOpenAI: HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+      }
+      return null;
+    }
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
@@ -178,7 +217,10 @@ async function parseWithOpenAI(text: string): Promise<ParsedCapture | null> {
       ...parsed,
       provider_used: `openai (${model})`,
     };
-  } catch {
+  } catch (error) {
+    if (AI_DEBUG) {
+      console.error('[AI] parseWithOpenAI failed:', error);
+    }
     return null;
   }
 }
