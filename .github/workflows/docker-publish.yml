@@ -44,8 +44,9 @@ jobs:
         id: version
         run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      - name: Extract metadata (tags, labels)
-        id: meta
+      - name: Extract metadata for tag push (semantic versioning)
+        id: meta-tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -55,23 +56,75 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
-      - name: Build and push Docker image
-        id: build-and-push
+      - name: Extract metadata for branch push (dev image)
+        id: meta-branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=dev
+            type=sha,prefix=sha-
+
+      - name: Extract metadata for PR (no push)
+        id: meta-pr
+        if: github.event_name == 'pull_request'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=pr-${{ github.event.number }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image (tag push)
+        id: build-tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64  # ,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-tag.outputs.tags }}
+          labels: ${{ steps.meta-tag.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Docker image (branch push)
+        id: build-branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta-branch.outputs.tags }}
+          labels: ${{ steps.meta-branch.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Docker image (PR)
+        id: build-pr
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta-pr.outputs.tags }}
+          labels: ${{ steps.meta-pr.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Output image digest
         if: github.event_name != 'pull_request'
-        run: echo "Image pushed with digest ${{ steps.build-and-push.outputs.digest }}"
+        run: |
+          if [ "${{ steps.build-tag.outputs.digest }}" != "" ]; then
+            echo "Image pushed with digest ${{ steps.build-tag.outputs.digest }}"
+          else
+            echo "Image pushed with digest ${{ steps.build-branch.outputs.digest }}"
+          fi
