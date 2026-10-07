@@ -20,6 +20,17 @@ import {
 import React, { useEffect, useState } from 'react';
 import { NavItem } from '../Sidebar';
 import { formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, toISODate } from '@/lib/date';
+
+function parseTimeToMinutes(timeStr: string): number {
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 9999;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && hours !== 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
 import { EditTaskPanel } from '@/components/EditTaskPanel';
 import { EditRoutinePanel } from '@/components/EditRoutinePanel';
 
@@ -435,14 +446,21 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
             <div className="space-y-2">
               {events.length > 0 ? (
-                events.map((ev) => (
+                [...events].sort((a, b) => {
+                  const dateA = new Date(a.date).getTime();
+                  const dateB = new Date(b.date).getTime();
+                  if (dateA !== dateB) return dateA - dateB;
+                  const timeA = a.startTime ? parseTimeToMinutes(a.startTime) : -1;
+                  const timeB = b.startTime ? parseTimeToMinutes(b.startTime) : -1;
+                  return timeA - timeB;
+                }).map((ev) => (
                   <div
                     key={ev.id}
                     className="flex items-start gap-4 p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card)]"
                   >
                     <div className="w-24 shrink-0 font-mono text-xs font-medium text-[var(--paper-muted)]">
                       <div>{ev.startTime || 'All Day'}</div>
-                      {ev.date && toISODate(ev.date) !== todayISOStr && (
+                      {ev.date && (
                         <div className="text-[10px] text-[var(--paper-muted)]/80">
                           {formatDateDDMMYYYY(ev.date)}
                         </div>

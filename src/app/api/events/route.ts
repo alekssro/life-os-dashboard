@@ -5,7 +5,6 @@ import { prisma } from '@/lib/prisma';
 import { parseFlexibleDate } from '@/lib/date';
 
 export async function GET() {
-  // Up Next shows today and later only, capped so the widget stays scannable.
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -15,7 +14,7 @@ export async function GET() {
         gte: startOfToday,
       },
     },
-    orderBy: { date: 'asc' },
+    orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     take: 10,
     include: {
       domain: true,
