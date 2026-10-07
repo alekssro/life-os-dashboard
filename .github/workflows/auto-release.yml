@@ -1,0 +1,99 @@
+name: Auto Release on Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version from package.json
+        id: current-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get latest release tag
+        id: latest-release
+        run: |
+          LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          CURRENT="v${{ steps.current-version.outputs.VERSION }}"
+          LATEST="${{ steps.latest-release.outputs.LATEST_TAG }}"
+          
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "RELEASE_NEEDED=false" >> $GITHUB_OUTPUT
+            echo "Version $CURRENT already released"
+          else
+            echo "RELEASE_NEEDED=true" >> $GITHUB_OUTPUT
+            echo "New version $CURRENT detected (latest release: $LATEST)"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.version-check.outputs.RELEASE_NEEDED == 'true'
+        run: |
+          LATEST="${{ steps.latest-release.outputs.LATEST_TAG }}"
+          if [ -z "$LATEST" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --oneline --pretty=format:"- %s" | head -50)
+          else
+            # Changes since last release
+            CHANGELOG=$(git log ${LATEST}..HEAD --oneline --pretty=format:"- %s" | head -50)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.version-check.outputs.RELEASE_NEEDED == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.current-version.outputs.VERSION }}
+          name: Release v${{ steps.current-version.outputs.VERSION }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## Docker Images
+            \`\`\`bash
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.current-version.outputs.VERSION }}
+            docker pull ghcr.io/${{ github.repository }}:v${{ steps.current-version.outputs.VERSION }}
+            \`\`\`
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Docker Build Workflow
+        if: steps.version-check.outputs.RELEASE_NEEDED == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker-publish.yml',
+              ref: 'main',
+              inputs: {}
+            });
