@@ -66,7 +66,7 @@ export default function HomePage() {
       </aside>
 
       {/* Main View Area */}
-      <main className="flex-1 overflow-y-auto lg:pb-0 pb-20">
+      <main className="flex-1 overflow-y-auto lg:pb-0 pb-28 lg:pr-0 pr-20">
         {currentView === 'today' && (
           <TodayDashboard
             key={refreshKey}
@@ -87,6 +87,8 @@ export default function HomePage() {
       <BottomNav
         currentView={currentView}
         onSelectView={(v) => setCurrentView(v)}
+        onOpenCapture={() => setIsCaptureOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         slippingCount={slippingCount}
       />
 

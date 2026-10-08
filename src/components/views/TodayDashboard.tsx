@@ -298,7 +298,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 hidden lg:flex">
           <button
             onClick={() => loadData()}
             className="p-2 rounded border border-[var(--paper-border)] hover:bg-[var(--paper-card-subtle)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] transition-colors"
