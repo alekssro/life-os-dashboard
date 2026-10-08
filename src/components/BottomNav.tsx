@@ -133,7 +133,7 @@ export function BottomNav({
           <div className="relative" ref={moreRef}>
             <button
               onClick={() => setIsMoreOpen(!isMoreOpen)}
-              className={`flex flex-col items-center justify-center gap-1 py-2.5 px-1 transition-colors ${
+              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 px-1 transition-colors ${
                 isMoreOpen ? 'text-[var(--paper-accent)]' : 'text-[var(--paper-muted)]'
               }`}
             >
