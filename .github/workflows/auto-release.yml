@@ -76,11 +76,11 @@ jobs:
             ${{ steps.changelog.outputs.CHANGELOG }}
             
             ## Docker Images
-            \`\`\`bash
+            ```bash
             docker pull ghcr.io/${{ github.repository }}:latest
             docker pull ghcr.io/${{ github.repository }}:${{ steps.current-version.outputs.VERSION }}
             docker pull ghcr.io/${{ github.repository }}:v${{ steps.current-version.outputs.VERSION }}
-            \`\`\`
+            ```
           draft: false
           prerelease: false
         env:
