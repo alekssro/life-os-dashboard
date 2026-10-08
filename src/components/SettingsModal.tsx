@@ -15,9 +15,13 @@ import {
   RefreshCw,
   Trash2,
   ExternalLink,
+  Info,
 } from 'lucide-react';
 import { useTheme, ThemeType } from '@/lib/theme';
 import { formatDateDDMMYYYY } from '@/lib/date';
+import packageJson from '../../package.json';
+
+const APP_VERSION = packageJson.version;
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -355,8 +359,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         </section>
 
-        {/* Close Button */}
-        <div className="flex justify-end pt-2 border-t border-[var(--paper-border)]">
+        {/* Version Info */}
+        <div className="flex items-center justify-between pt-2 border-t border-[var(--paper-border)]">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--paper-muted)]">
+            <Info className="w-3.5 h-3.5" />
+            <span>Life OS Dashboard v{APP_VERSION}</span>
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded bg-[var(--paper-accent)] text-white text-xs font-mono font-medium hover:opacity-90"
