@@ -130,10 +130,10 @@ export function BottomNav({
           })}
 
           {/* More Menu Button */}
-          <div className="relative" ref={moreRef}>
+          <div className="relative flex items-center justify-center" ref={moreRef}>
             <button
               onClick={() => setIsMoreOpen(!isMoreOpen)}
-              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 px-1 transition-colors ${
+              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 px-1 w-full transition-colors ${
                 isMoreOpen ? 'text-[var(--paper-accent)]' : 'text-[var(--paper-muted)]'
               }`}
             >
