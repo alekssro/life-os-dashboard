@@ -212,6 +212,20 @@ Daily / Weekly (weekdays) / Monthly (day of month):
 Intervals (`every > 1`, e.g. every 2 weeks or every 3 months) are not
 representable and are ignored.
 
+#### Completion sync (two-way)
+
+- **Superlist → dashboard:** running **Sync now** marks tasks completed in
+  Superlist as Done in the dashboard and refreshes their completion time.
+- **dashboard → Superlist:** completing a task in the dashboard immediately
+  calls Superlist's `complete_task`, so it is completed in Superlist too.
+  Completing a **Routine** created from a recurring Superlist task rolls that
+  task forward to its next occurrence.
+
+Superlist's API can complete a task but **cannot reopen** one, so un-completing
+a task (or routine) in the dashboard is local-only and never changes Superlist.
+If the push fails (not connected, expired token, offline), the local completion
+still succeeds and the failure is logged.
+
 #### OAuth endpoints used
 
 | Purpose | Endpoint |

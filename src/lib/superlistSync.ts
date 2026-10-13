@@ -230,6 +230,9 @@ export async function pullSuperlistTasks(token: string): Promise<SuperlistPullRe
     for (const t of rawTasks) {
       const taskId = t?.uuid || null;
       if (!taskId) continue;
+      // Superlist keeps trashed tasks in get_list responses (status
+      // "deleted"); ignore them so a deleted task is not re-created locally.
+      if (t.status === 'deleted') continue;
       tasks.push({
         title: t.title || '',
         id: taskId,
@@ -247,4 +250,64 @@ export async function pullSuperlistTasks(token: string): Promise<SuperlistPullRe
   }
 
   return { tasks, lists: listMeta, timezone };
+}
+
+/**
+ * Invoke a single Superlist MCP tool (initialize a session, then tools/call)
+ * and return its structured payload. Used for write operations.
+ */
+async function callSuperlistTool(token: string, name: string, args: any): Promise<any> {
+  const url = process.env.SUPERLIST_MCP_URL || 'https://app.superlist.com/mcp';
+
+  const init = await mcpRequest(url, token, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: 'life-os-dashboard', version: '1.0.0' },
+    },
+  });
+
+  await mcpRequest(
+    url,
+    token,
+    { jsonrpc: '2.0', method: 'notifications/initialized' },
+    init.sessionId
+  ).catch(() => undefined);
+
+  const resp = await mcpRequest(
+    url,
+    token,
+    {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name, arguments: args },
+    },
+    init.sessionId
+  );
+
+  return extractToolResult(resp.message.result);
+}
+
+/**
+ * Mark a Superlist task as complete via the MCP. Completing a task that has a
+ * repetition rule rolls it forward to its next occurrence (Superlist handles
+ * that), so this also serves routines created from recurring tasks.
+ */
+export async function completeSuperlistTask(token: string, taskUuid: string): Promise<void> {
+  if (!token) throw new Error('Superlist token is not configured');
+  if (!taskUuid) throw new Error('Missing Superlist task id');
+
+  const result = await callSuperlistTool(token, 'complete_task', { task_uuid: taskUuid });
+
+  // complete_task returns { success, results: [...] } — surface failures.
+  if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist complete_task failed: ${detail}`);
+  }
 }

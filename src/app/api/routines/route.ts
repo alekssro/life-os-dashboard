@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { todayISO, getWeekStart, getWeekEnd, formatDateYYYYMMDD } from '@/lib/date';
 import { isDueToday } from '@/lib/routines';
+import { pushSuperlistCompletion } from '@/lib/superlistWrite';
 
 function calculateConsistencyScore(routine: any, logs: any[]): number {
   const now = new Date();
@@ -148,6 +149,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Snapshot the current log so we can tell a fresh completion from a repeat.
+    const existingLog = await prisma.routineLog.findUnique({
+      where: { routineId_date: { routineId, date: targetDate } },
+    });
+
     if (completed) {
       await prisma.routineLog.upsert({
         where: { routineId_date: { routineId, date: targetDate } },
@@ -245,6 +251,16 @@ export async function POST(req: NextRequest) {
           lastCompletedDate: newStreak > 0 ? targetDate : null,
         },
       });
+    }
+
+    // Two-way completion sync: mirror a fresh completion of a linked routine to
+    // Superlist (which rolls the recurring task forward to its next occurrence).
+    // Un-completing stays local because Superlist cannot reopen a task.
+    if (completed && !existingLog?.completed && routine.superlistId) {
+      const push = await pushSuperlistCompletion(routine.superlistId);
+      if (!push.ok) {
+        console.warn(`Superlist completion push failed for routine ${routineId}: ${push.error}`);
+      }
     }
 
     return NextResponse.json({ success: true });

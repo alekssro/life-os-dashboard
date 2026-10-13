@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseFlexibleDate } from '@/lib/date';
+import { pushSuperlistCompletion } from '@/lib/superlistWrite';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -98,6 +99,18 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
     }
 
+    const existing = await prisma.task.findUnique({
+      where: { id },
+      select: { status: true, superlistId: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Detect a fresh completion so we can mirror it to Superlist (only when the
+    // task comes from Superlist and this is not a no-op re-save).
+    const becameDone = updates.status === 'DONE' && existing.status !== 'DONE';
+
     if (updates.status === 'DONE') {
       updates.completedAt = new Date();
     } else if (updates.status === 'TODO') {
@@ -129,7 +142,17 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(task);
+    // Two-way completion sync: push a completion to Superlist. Un-completing is
+    // local-only because Superlist cannot reopen a completed task.
+    let superlistPush: { ok: boolean; error?: string } | undefined;
+    if (becameDone && task.superlistId) {
+      superlistPush = await pushSuperlistCompletion(task.superlistId);
+      if (!superlistPush.ok) {
+        console.warn(`Superlist completion push failed for task ${task.id}: ${superlistPush.error}`);
+      }
+    }
+
+    return NextResponse.json(superlistPush ? { ...task, superlistPush } : task);
   } catch (error) {
     console.error('Error updating task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
