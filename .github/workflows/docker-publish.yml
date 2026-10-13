@@ -1,19 +1,16 @@
 name: Build and Push Docker Image
 
+# An image is only built when a release is made:
+#   - a GitHub Release is published, or
+#   - the Auto Release workflow dispatches `docker-build-trigger`, or
+#   - a maintainer runs this workflow manually (workflow_dispatch).
+# Plain pushes to main and pull requests do NOT build or publish an image.
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
   release:
     types: [published]
   repository_dispatch:
     types: [docker-build-trigger]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -39,35 +36,30 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version from tag, release, or dispatch
+      - name: Determine version from release, dispatch, or package.json
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/v* ]]; then
-            # Extract version from tag (e.g., v1.1.0 -> 1.1.0)
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
-            # Extract version from release tag
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            # Extract version from the published release tag (e.g., v1.1.0 -> 1.1.0)
             VERSION="${{ github.event.release.tag_name }}"
             VERSION="${VERSION#v}"
           elif [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             # Extract version from dispatch payload
             VERSION="${{ github.event.client_payload.version }}"
           else
-            # Fallback to package.json for branch pushes
+            # Manual run: fall back to the package.json version
             VERSION=$(node -p "require('./package.json').version")
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Extract metadata for tag push (semantic versioning)
-        id: meta-tag
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || github.event_name == 'repository_dispatch'
+      - name: Extract metadata (semantic versioning)
+        id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -79,108 +71,49 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest
 
-      - name: Extract metadata for branch push (dev image)
-        id: meta-branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=dev
-            type=sha,prefix=sha-
-
-      - name: Extract metadata for PR (no push)
-        id: meta-pr
-        if: github.event_name == 'pull_request'
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=pr-${{ github.event.number }}
-            type=sha,prefix=sha-
-
-      - name: Build and push Docker image (tag/release/dispatch)
-        id: build-tag
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') || github.event_name == 'release' || github.event_name == 'repository_dispatch'
+      - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta-tag.outputs.tags }}
-          labels: ${{ steps.meta-tag.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Docker image (branch push)
-        id: build-branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta-branch.outputs.tags }}
-          labels: ${{ steps.meta-branch.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build Docker image (PR)
-        id: build-pr
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: false
-          tags: ${{ steps.meta-pr.outputs.tags }}
-          labels: ${{ steps.meta-pr.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Attach package to GitHub Release
-        if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'repository_dispatch'
+        if: github.event_name == 'release' || github.event_name == 'repository_dispatch'
         uses: actions/github-script@v7
         with:
           script: |
-            const packageName = '${{ env.IMAGE_NAME }}'.toLowerCase();
-            const version = '${{ steps.version.outputs.VERSION }}';
-            const registry = '${{ env.REGISTRY }}';
-            
-            let tag = '';
-            if ('${{ github.event_name }}' == 'release') {
-              tag = '${{ github.event.release.tag_name }}';
-            } else {
-              tag = 'v' + version;
+            const version = "${{ steps.version.outputs.VERSION }}";
+            const tag =
+              "${{ github.event_name }}" === "release"
+                ? "${{ github.event.release.tag_name }}"
+                : `v${version}`;
+            const packageUrl = `https://ghcr.io/${{ github.repository }}`;
+
+            try {
+              const release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+
+              const packageInfo = `\n## Docker Images\n\`\`\`bash\ndocker pull ghcr.io/${{ github.repository }}:latest\ndocker pull ghcr.io/${{ github.repository }}:${version}\ndocker pull ghcr.io/${{ github.repository }}:v${version}\n\`\`\`\n\n**Package:** ${packageUrl}`;
+
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.data.id,
+                body: release.data.body + packageInfo,
+              });
+            } catch (error) {
+              core.warning(`Could not attach package info to release ${tag}: ${error.message}`);
             }
-            
-            // Get the release
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: tag
-            });
-            
-            // Create release asset note with package info
-            const packageUrl = `https://${registry}/${packageName}`;
-            const body = release.data.body || '';
-            const packageInfo = `\n## Docker Images\n\n\`\`\`bash\n# Latest release\ndocker pull ${registry}/${packageName}:latest\n\ndocker pull ${registry}/${packageName}:${version}\n\ndocker pull ${registry}/${packageName}:v${version}\n\`\`\`\n\n**Package:** ${packageUrl}`;
-            
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.data.id,
-              body: body + packageInfo
-            });
 
       - name: Output image digest
-        if: github.event_name != 'pull_request'
-        run: |
-          if [ "${{ steps.build-tag.outputs.digest }}" != "" ]; then
-            echo "Image pushed with digest ${{ steps.build-tag.outputs.digest }}"
-          else
-            echo "Image pushed with digest ${{ steps.build-branch.outputs.digest }}"
-          fi
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
