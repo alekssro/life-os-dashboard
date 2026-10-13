@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
-import { DateInput } from '@/components/DateInput';
+import { CalendarDateInput } from '@/components/CalendarDateInput';
 import { toISODate } from '@/lib/date';
 import { buildSuperlistTaskUrl, extractSuperlistIds } from '@/lib/superlist';
 
@@ -90,7 +90,7 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
         </select>
 
         {/* Due Date */}
-        <DateInput
+        <CalendarDateInput
           value={dueDate}
           onChange={setDueDate}
           className="bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1 rounded border border-[var(--paper-border)] text-xs font-mono flex-1 min-w-[130px]"
