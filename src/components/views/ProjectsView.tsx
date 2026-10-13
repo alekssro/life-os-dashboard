@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FolderKanban, Clock, AlertTriangle, Plus, CheckCircle2, Trash2, Hourglass, PauseCircle, Activity } from 'lucide-react';
+import { FolderKanban, Clock, AlertTriangle, Plus, CheckCircle2, Trash2, Hourglass, PauseCircle, Activity, ExternalLink } from 'lucide-react';
 import { formatDateDDMMYYYY } from '@/lib/date';
 
 const HEALTH_COLORS = {
@@ -30,6 +30,7 @@ export function ProjectsView() {
   const [newWaitingOn, setNewWaitingOn] = useState('');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editWaitingOn, setEditWaitingOn] = useState('');
+  const [editSuperlistUrl, setEditSuperlistUrl] = useState('');
 
   const loadProjects = async () => {
     const [pRes, dRes] = await Promise.all([
@@ -166,7 +167,15 @@ export function ProjectsView() {
           return (
             <div
               key={project.id}
-              onClick={() => setEditingProjectId(editingProjectId === project.id ? null : project.id)}
+              onClick={() => {
+                if (editingProjectId === project.id) {
+                  setEditingProjectId(null);
+                } else {
+                  setEditingProjectId(project.id);
+                  setEditWaitingOn(project.waitingOn || '');
+                  setEditSuperlistUrl(project.superlistUrl || (project.superlistListId ? `https://app.superlist.com/lists/${project.superlistListId}` : ''));
+                }
+              }}
               className={`p-4 rounded border bg-[var(--paper-card)] flex flex-col justify-between transition-colors cursor-pointer ${
                 editingProjectId === project.id
                   ? 'border-[var(--paper-accent)] ring-1 ring-[var(--paper-accent)]'
@@ -211,8 +220,22 @@ export function ProjectsView() {
                   </div>
                 )}
 
-                <div className="text-xs text-[var(--paper-muted)]">
-                  {project.tasks?.length || 0} open active tasks
+                <div className="flex items-center justify-between text-xs text-[var(--paper-muted)]">
+                  <span>{project.tasks?.length || 0} open active tasks</span>
+                  {(project.superlistUrl || project.superlistListId) && (
+                    <a
+                      href={project.superlistUrl || `https://app.superlist.com/lists/${project.superlistListId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-[11px] font-mono text-red-600 dark:text-red-400 hover:underline"
+                      title="Open list in Superlist"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      Superlist List
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -253,7 +276,10 @@ export function ProjectsView() {
 
               {/* Inline edit panel */}
               {editingProjectId === project.id && (
-                <div className="mt-3 pt-3 border-t border-[var(--paper-border)] space-y-2">
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-3 pt-3 border-t border-[var(--paper-border)] space-y-2"
+                >
                   <div>
                     <label className="text-xs font-mono text-[var(--paper-muted)]">Waiting on:</label>
                     <input
@@ -264,7 +290,20 @@ export function ProjectsView() {
                       className="w-full mt-1 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs"
                     />
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div>
+                    <label className="text-xs font-mono text-[var(--paper-muted)] flex items-center justify-between">
+                      <span>Superlist List Link or UUID:</span>
+                      <span className="text-[10px] text-[var(--paper-muted)]/70">e.g. https://app.superlist.com/lists/UUID</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editSuperlistUrl}
+                      onChange={(e) => setEditSuperlistUrl(e.target.value)}
+                      placeholder="https://app.superlist.com/lists/..."
+                      className="w-full mt-1 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
                     <button
                       onClick={() => setEditingProjectId(null)}
                       className="px-2 py-1 text-xs text-[var(--paper-muted)] hover:text-[var(--paper-text)]"
@@ -272,7 +311,24 @@ export function ProjectsView() {
                       Cancel
                     </button>
                     <button
-                      onClick={() => handleSaveEdit(project.id, { waitingOn: editWaitingOn || null })}
+                      onClick={() => {
+                        let listId: string | null = null;
+                        let url: string | null = editSuperlistUrl.trim() || null;
+                        if (url) {
+                          const uuidMatch = url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+                          if (uuidMatch) {
+                            listId = uuidMatch[0];
+                            if (!url.startsWith('http') && !url.startsWith('superlist://')) {
+                              url = `https://app.superlist.com/lists/${listId}`;
+                            }
+                          }
+                        }
+                        handleSaveEdit(project.id, {
+                          waitingOn: editWaitingOn || null,
+                          superlistUrl: url,
+                          superlistListId: listId,
+                        });
+                      }}
                       className="px-2 py-1 text-xs bg-[var(--paper-accent)] text-white rounded font-mono"
                     >
                       Save

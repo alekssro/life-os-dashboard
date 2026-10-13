@@ -63,6 +63,10 @@ export async function POST(req: NextRequest) {
         projectId: data.projectId || null,
         isRecurring: Boolean(data.isRecurring),
         recurrenceRule: data.recurrenceRule,
+        source: data.source || (data.superlistId ? 'SUPERLIST' : 'MANUAL'),
+        superlistId: data.superlistId || null,
+        superlistListId: data.superlistListId || null,
+        superlistUrl: data.superlistUrl || null,
       },
       include: {
         domain: true,

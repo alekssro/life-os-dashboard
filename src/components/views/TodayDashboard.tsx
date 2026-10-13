@@ -31,8 +31,20 @@ function parseTimeToMinutes(timeStr: string): number {
   if (ampm === 'AM' && hours === 12) hours = 0;
   return hours * 60 + minutes;
 }
+
+function getGoogleCalendarUrl(date: Date | string, title?: string): string {
+  const d = new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  if (title) {
+    return `https://calendar.google.com/calendar/u/0/r/search?q=${encodeURIComponent(title)}`;
+  }
+  return `https://calendar.google.com/calendar/u/0/r/day/${yyyy}/${mm}/${dd}`;
+}
 import { EditTaskPanel } from '@/components/EditTaskPanel';
 import { EditRoutinePanel } from '@/components/EditRoutinePanel';
+import { resolveSuperlistTaskUrl } from '@/lib/superlist';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
@@ -372,6 +384,20 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                         <span className="text-[10px] font-mono text-[var(--paper-accent)] uppercase font-semibold">
                           Due Today
                         </span>
+                        {(task.source === 'SUPERLIST' || task.superlistUrl) && (
+                          <a
+                            href={resolveSuperlistTaskUrl(task) || 'https://app.superlist.com'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono text-red-600 dark:text-red-400 hover:underline uppercase"
+                            title="Open in Superlist"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            Superlist
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -456,7 +482,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                 }).map((ev) => (
                   <div
                     key={ev.id}
-                    className="flex items-start gap-4 p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card)]"
+                    className="flex items-start gap-4 p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card)] group hover:border-[var(--paper-border-strong)] transition-colors"
                   >
                     <div className="w-24 shrink-0 font-mono text-xs font-medium text-[var(--paper-muted)]">
                       <div>{ev.startTime || 'All Day'}</div>
@@ -467,20 +493,31 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-[var(--paper-text)]">{ev.title}</p>
-                        {ev.calendar && (
-                          <span
-                            className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0"
-                            style={{ borderColor: ev.calendar.color || 'var(--paper-accent)' }}
-                          >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-sm font-medium text-[var(--paper-text)] truncate">{ev.title}</p>
+                          {ev.calendar && (
                             <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: ev.calendar.color || 'var(--paper-accent)' }}
-                            />
-                            {ev.calendar.name}
-                          </span>
-                        )}
+                              className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0"
+                              style={{ borderColor: ev.calendar.color || 'var(--paper-accent)' }}
+                            >
+                              <span
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: ev.calendar.color || 'var(--paper-accent)' }}
+                              />
+                              {ev.calendar.name}
+                            </span>
+                          )}
+                        </div>
+                        <a
+                          href={getGoogleCalendarUrl(ev.date, ev.title)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 rounded text-[var(--paper-muted)] hover:text-[var(--paper-accent)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          title="Open in Google Calendar"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       </div>
                       {ev.location && (
                         <p className="text-xs text-[var(--paper-muted)] mt-0.5 truncate">
@@ -575,6 +612,21 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                             <Repeat className="w-3 h-3" />
                             {task.recurrenceRule || 'Recurring'}
                           </span>
+                        )}
+
+                        {(task.source === 'SUPERLIST' || task.superlistUrl) && (
+                          <a
+                            href={resolveSuperlistTaskUrl(task) || 'https://app.superlist.com'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono text-red-600 dark:text-red-400 hover:underline uppercase"
+                            title="Open in Superlist"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            Superlist
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
                         )}
                       </div>
                     </div>

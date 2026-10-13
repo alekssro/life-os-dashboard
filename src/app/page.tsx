@@ -46,6 +46,16 @@ export default function HomePage() {
       .catch(() => {});
   }, [refreshKey]);
 
+  // After a Superlist OAuth login redirect, re-open the settings modal so the
+  // result (?superlist=connected|error) is surfaced to the user.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('superlist')) {
+      setIsSettingsOpen(true);
+    }
+  }, []);
+
   const handleCaptured = () => {
     setRefreshKey((k) => k + 1);
   };

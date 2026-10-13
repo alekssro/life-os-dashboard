@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
         monthlyBudgetHours: data.monthlyBudgetHours ? parseFloat(data.monthlyBudgetHours) : null,
         domainId: data.domainId || null,
         waitingOn: data.waitingOn || null,
+        superlistListId: data.superlistListId || null,
+        superlistUrl: data.superlistUrl || (data.superlistListId ? `https://app.superlist.com/lists/${data.superlistListId}` : null),
       },
       include: {
         domain: true,

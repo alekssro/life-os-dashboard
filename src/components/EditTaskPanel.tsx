@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { DateInput } from '@/components/DateInput';
 import { toISODate } from '@/lib/date';
+import { buildSuperlistTaskUrl, extractSuperlistIds } from '@/lib/superlist';
 
 export const RECURRENCE_OPTIONS = [
   { value: '', label: 'None' },
@@ -27,9 +28,21 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
   const [dueDate, setDueDate] = useState(task.dueDate ? toISODate(task.dueDate) : '');
   const [recurrenceRule, setRecurrenceRule] = useState(task.recurrenceRule || '');
   const [notes, setNotes] = useState(task.notes || '');
+  const [superlistUrl, setSuperlistUrl] = useState(task.superlistUrl || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const raw = superlistUrl.trim() || null;
+    const parsed = extractSuperlistIds(raw);
+    // Fall back to ids already known on the task / its linked project.
+    const listId = parsed.listId || task.superlistListId || task.project?.superlistListId || null;
+    const taskId = parsed.taskId || task.superlistId || null;
+
+    let url: string | null = raw;
+    if (raw && !/^(https?:\/\/|superlist:\/\/)/i.test(raw)) {
+      // Bare UUID(s) — normalize into a canonical list-scoped URL when possible.
+      url = buildSuperlistTaskUrl(listId, taskId);
+    }
     onSave({
       title: title.trim(),
       domainId: domainId || null,
@@ -37,6 +50,10 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
       isRecurring: Boolean(recurrenceRule),
       recurrenceRule: recurrenceRule || null,
       notes: notes.trim() || null,
+      superlistUrl: url,
+      superlistId: taskId,
+      superlistListId: listId,
+      source: (url || task.source === 'SUPERLIST') ? 'SUPERLIST' : 'MANUAL',
     });
   };
 
@@ -101,6 +118,21 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
         rows={2}
         className="w-full bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1.5 rounded border border-[var(--paper-border)] text-xs font-mono resize-none focus:outline-none focus:border-[var(--paper-accent)]"
       />
+
+      {/* Superlist Link */}
+      <div>
+        <label className="text-[10px] font-mono text-[var(--paper-muted)] flex items-center justify-between">
+          <span>Superlist Task Link or UUID:</span>
+          <span className="text-[9px] text-[var(--paper-muted)]/70">e.g. https://app.superlist.com/lists/LIST-ID/tasks/TASK-ID</span>
+        </label>
+        <input
+          type="text"
+          value={superlistUrl}
+          onChange={(e) => setSuperlistUrl(e.target.value)}
+          placeholder="https://app.superlist.com/lists/.../tasks/..."
+          className="w-full mt-0.5 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1 rounded border border-[var(--paper-border)] text-xs font-mono"
+        />
+      </div>
 
       <div className="flex justify-end gap-2">
         <button

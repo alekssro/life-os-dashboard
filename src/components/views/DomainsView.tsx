@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, CheckCircle, Folder, Trash2 } from 'lucide-react';
+import { Layers, Plus, CheckCircle, Folder, Trash2, ExternalLink } from 'lucide-react';
 
 export function DomainsView() {
   const [domains, setDomains] = useState<any[]>([]);
@@ -98,6 +98,18 @@ export function DomainsView() {
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
+            {(domain.superlistUrl || domain.superlistListId) && (
+              <a
+                href={domain.superlistUrl || `https://app.superlist.com/lists/${domain.superlistListId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-red-500 hover:text-red-600"
+                title="Open this list in Superlist"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Superlist list</span>
+              </a>
+            )}
             <div className="pt-2 border-t border-[var(--paper-border)] text-xs font-mono text-[var(--paper-muted)] flex justify-between">
               <span>{domain._count?.projects || 0} projects</span>
               <span>{domain._count?.tasks || 0} tasks</span>

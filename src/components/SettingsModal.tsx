@@ -16,6 +16,7 @@ import {
   Trash2,
   ExternalLink,
   Info,
+  ListTodo,
 } from 'lucide-react';
 import { useTheme, ThemeType } from '@/lib/theme';
 import { formatDateDDMMYYYY } from '@/lib/date';
@@ -41,7 +42,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [calStatusMsg, setCalStatusMsg] = useState<string | null>(null);
 
-  // Load calendars when opening
+  // Superlist status state
+  const [superlistInfo, setSuperlistInfo] = useState<{ totalSynced: number; openCount: number; linkedProjects: any[]; linkedDomains: any[] } | null>(null);
+  const [superlistAuth, setSuperlistAuth] = useState<{ connected: boolean; hasRefreshToken: boolean; expiresAt: number | null; envTokenConfigured: boolean } | null>(null);
+  const [isSuperlistSyncing, setIsSuperlistSyncing] = useState(false);
+  const [isSuperlistConnecting, setIsSuperlistConnecting] = useState(false);
+  const [superlistSyncMsg, setSuperlistSyncMsg] = useState<string | null>(null);
+
+  // Load calendars and superlist when opening
   const loadCalendars = async () => {
     try {
       const res = await fetch('/api/calendar');
@@ -51,9 +59,104 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
+  const loadSuperlistAuth = async () => {
+    try {
+      const res = await fetch('/api/integrations/superlist/oauth/status');
+      if (res.ok) setSuperlistAuth(await res.json());
+    } catch (err) {
+      console.error('Error loading Superlist auth status:', err);
+    }
+  };
+
+  const loadSuperlistInfo = async () => {
+    try {
+      const res = await fetch('/api/integrations/superlist');
+      if (res.ok) setSuperlistInfo(await res.json());
+    } catch (err) {
+      console.error('Error loading Superlist info:', err);
+    }
+  };
+
+  // Surface the result of an OAuth login redirect (?superlist=connected|error)
+  useEffect(() => {
+    if (!isOpen) return;
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('superlist');
+    if (result === 'connected') {
+      setSuperlistSyncMsg('Connected to Superlist. You can sync now.');
+      loadSuperlistAuth();
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (result === 'error') {
+      setSuperlistSyncMsg(`Superlist login error: ${params.get('message') || 'unknown error'}`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [isOpen]);
+
+  const handleSuperlistConnect = async () => {
+    setIsSuperlistConnecting(true);
+    setSuperlistSyncMsg(null);
+    try {
+      const res = await fetch('/api/integrations/superlist/oauth', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.authorizationUrl) {
+        // Navigate to Superlist's login page; it redirects back to
+        // ?superlist=connected on success.
+        window.location.href = data.authorizationUrl;
+      } else {
+        setSuperlistSyncMsg(data.error || 'Could not start Superlist login.');
+      }
+    } catch (err) {
+      console.error('Error connecting Superlist:', err);
+      setSuperlistSyncMsg('Could not start Superlist login — check the server logs.');
+    } finally {
+      setIsSuperlistConnecting(false);
+    }
+  };
+
+  const handleSuperlistDisconnect = async () => {
+    setSuperlistSyncMsg(null);
+    try {
+      await fetch('/api/integrations/superlist/oauth', { method: 'DELETE' });
+      setSuperlistAuth(null);
+      setSuperlistInfo(null);
+      setSuperlistSyncMsg('Disconnected from Superlist.');
+    } catch (err) {
+      console.error('Error disconnecting Superlist:', err);
+    }
+  };
+
+  const handleSuperlistSync = async () => {
+    setIsSuperlistSyncing(true);
+    setSuperlistSyncMsg(null);
+    try {
+      const res = await fetch('/api/integrations/superlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_PULL' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuperlistSyncMsg(data.message || 'Superlist sync completed.');
+        loadSuperlistInfo();
+      } else {
+        setSuperlistSyncMsg(data.error || `Sync failed (${res.status})`);
+        if (data.code === 'NOT_CONNECTED' || data.code === 'REAUTH_REQUIRED') {
+          loadSuperlistAuth();
+        }
+      }
+    } catch (err) {
+      console.error('Error syncing Superlist:', err);
+      setSuperlistSyncMsg('Sync failed — check the server logs.');
+    } finally {
+      setIsSuperlistSyncing(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadCalendars();
+      loadSuperlistInfo();
+      loadSuperlistAuth();
     }
   }, [isOpen]);
 
@@ -296,7 +399,133 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           )}
         </section>
 
-        {/* 2. Theme Configuration (Web / Phone vs E-Ink Tablets) */}
+        {/* 2. Superlist Integration */}
+        <section className="space-y-3 pt-4 border-t border-[var(--paper-border)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--paper-text)]">
+              <ListTodo className="w-4 h-4 text-red-500" />
+              <span>Superlist Integration</span>
+            </div>
+            <a
+              href="superlist://"
+              className="text-xs font-mono text-[var(--paper-muted)] hover:text-[var(--paper-text)] flex items-center gap-1"
+              title="Open Superlist app"
+            >
+              <span>Open Superlist</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <p className="text-xs text-[var(--paper-muted)] font-serif leading-relaxed">
+            Link tasks and projects directly to your Superlist workspace. Tasks originating from Superlist show a distinct red badge and deep-link directly into the desktop/web app.
+          </p>
+
+          <div className="p-3 rounded border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--paper-muted)]">Authorization:</span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                <span
+                  className={`inline-block w-2 h-2 rounded-full ${
+                    superlistAuth?.connected ? 'bg-green-500' : 'bg-red-400'
+                  }`}
+                />
+                <span className={superlistAuth?.connected ? 'text-green-600' : 'text-[var(--paper-text)]'}>
+                  {superlistAuth === null
+                    ? '…'
+                    : superlistAuth.connected
+                      ? 'Connected'
+                      : superlistAuth.envTokenConfigured
+                        ? 'Using env token'
+                        : 'Not connected'}
+                </span>
+              </span>
+            </div>
+            {superlistAuth?.connected && superlistAuth.expiresAt && (
+              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--paper-muted)]">
+                <span>Access token expires:</span>
+                <span>{new Date(superlistAuth.expiresAt).toLocaleString()}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--paper-muted)]">Connected Superlist Tasks:</span>
+              <span className="font-semibold text-[var(--paper-text)]">
+                {superlistInfo?.totalSynced || 0} total ({superlistInfo?.openCount || 0} open)
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--paper-muted)]">Domains Linked to Superlist Lists:</span>
+              <span className="font-semibold text-[var(--paper-text)]">
+                {superlistInfo?.linkedDomains?.length || 0} domains
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--paper-muted)]">Projects Linked to Superlist Lists:</span>
+              <span className="font-semibold text-[var(--paper-text)]">
+                {superlistInfo?.linkedProjects?.length || 0} projects
+              </span>
+            </div>
+            <div className="pt-2 border-t border-[var(--paper-border)] text-[11px] font-mono text-[var(--paper-muted)]">
+              <span>Sync Endpoint: </span>
+              <code className="text-[var(--paper-text)]">POST /api/integrations/superlist</code>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {superlistAuth?.connected ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSuperlistSync}
+                  disabled={isSuperlistSyncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-xs font-mono text-[var(--paper-text)] hover:border-[var(--paper-accent)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSuperlistSyncing ? 'animate-spin' : ''}`} />
+                  {isSuperlistSyncing ? 'Syncing…' : 'Sync now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSuperlistConnect}
+                  disabled={isSuperlistConnecting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-xs font-mono text-[var(--paper-muted)] hover:border-[var(--paper-accent)] hover:text-[var(--paper-text)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Re-authorize with a different Superlist account"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSuperlistConnecting ? 'animate-spin' : ''}`} />
+                  {isSuperlistConnecting ? 'Redirecting…' : 'Reconnect'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSuperlistDisconnect}
+                  className="px-3 py-1.5 rounded border border-[var(--paper-border)] bg-transparent text-xs font-mono text-[var(--paper-muted)] hover:text-red-500 hover:border-red-400"
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSuperlistConnect}
+                disabled={isSuperlistConnecting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-[var(--paper-accent)] bg-[var(--paper-card-subtle)] text-xs font-mono text-[var(--paper-text)] hover:bg-[var(--paper-accent)] hover:text-[var(--paper-bg)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ListTodo className="w-3.5 h-3.5" />
+                {isSuperlistConnecting ? 'Redirecting…' : 'Connect to Superlist'}
+              </button>
+            )}
+            <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+              {superlistAuth?.connected
+                ? 'Access tokens refresh automatically; reconnect if they are revoked.'
+                : 'Authorize once in your browser — “Sync now” pulls open tasks via MCP.'}
+            </span>
+          </div>
+
+          {superlistSyncMsg && (
+            <p className="text-[11px] font-mono text-[var(--paper-text)] bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] rounded px-2 py-1.5">
+              {superlistSyncMsg}
+            </p>
+          )}
+        </section>
+
+        {/* 3. Theme Configuration (Web / Phone vs E-Ink Tablets) */}
         <section className="space-y-3 pt-4 border-t border-[var(--paper-border)]">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--paper-text)]">
             <Tablet className="w-4 h-4 text-[var(--paper-accent)]" />

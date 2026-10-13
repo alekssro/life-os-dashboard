@@ -12,10 +12,12 @@ import {
   Pencil,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '@/lib/date';
 import { DateInput } from '@/components/DateInput';
 import { EditTaskPanel, RECURRENCE_OPTIONS } from '@/components/EditTaskPanel';
+import { resolveSuperlistTaskUrl } from '@/lib/superlist';
 
 export function TasksView() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -265,6 +267,20 @@ export function TasksView() {
                         {task.notes}
                       </span>
                     )}
+                    {(task.source === 'SUPERLIST' || task.superlistUrl) && (
+                      <a
+                        href={resolveSuperlistTaskUrl(task) || 'https://app.superlist.com'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-[10px] font-mono text-red-600 dark:text-red-400 hover:underline uppercase"
+                        title="Open in Superlist"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        Superlist
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -387,6 +403,20 @@ export function TasksView() {
                                 <Repeat className="w-3 h-3" />
                                 {task.recurrenceRule.charAt(0) + task.recurrenceRule.slice(1).toLowerCase()}
                               </span>
+                            )}
+                            {(task.source === 'SUPERLIST' || task.superlistUrl) && (
+                              <a
+                                href={resolveSuperlistTaskUrl(task) || 'https://app.superlist.com'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-red-600 dark:text-red-400 hover:underline uppercase"
+                                title="Open in Superlist"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                Superlist
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
                             )}
                           </div>
                         </div>

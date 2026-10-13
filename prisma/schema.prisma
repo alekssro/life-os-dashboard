@@ -17,6 +17,8 @@ model Domain {
   order                    Int            @default(0)
   slippingThresholdDays    Int?           @default(14)
   expectedActivityPerWeek  Int?
+  superlistListId          String?        // Associated Superlist list UUID
+  superlistUrl             String?        // Direct Superlist list link
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
   projects                 Project[]
@@ -25,6 +27,7 @@ model Domain {
   content                  ContentItem[]
   events                   ScheduleEvent[]
 
+  @@index([superlistListId])
   @@map("domains")
 }
 
@@ -64,6 +67,8 @@ model Project {
   health              ProjectHealth @default(ON_TRACK)
   healthUpdatedAt     DateTime      @default(now())
   waitingOn           String?       // What/who we're waiting for
+  superlistListId     String?       // Associated Superlist list UUID
+  superlistUrl        String?       // Direct Superlist list link (web or superlist://)
   domainId            String?
   domain              Domain?       @relation(fields: [domainId], references: [id], onDelete: SetNull)
   tasks               Task[]
@@ -105,6 +110,10 @@ model Task {
   isRecurring    Boolean      @default(false)
   recurrenceRule String?      // e.g. "DAILY", "WEEKLY", "MONTHLY"
   completedAt    DateTime?
+  source         String       @default("MANUAL") // MANUAL, SUPERLIST, QUICK_CAPTURE
+  superlistId    String?      @unique            // Superlist task UUID
+  superlistListId String?                        // Superlist list UUID this task belongs to
+  superlistUrl   String?                         // Direct Superlist link
   domainId       String?
   domain         Domain?      @relation(fields: [domainId], references: [id], onDelete: SetNull)
   projectId      String?

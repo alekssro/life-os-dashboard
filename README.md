@@ -110,6 +110,89 @@ curl -X POST http://localhost:3000/api/capture \
 
 ---
 
+## Superlist Integration
+
+Two ways to get Superlist tasks into the dashboard:
+
+### 1. Push (agents, MCP, scripts)
+
+`POST /api/integrations/superlist` with a task payload. Batching several
+tasks keeps Superlist's task IDs and lists in sync:
+
+```bash
+curl -X POST http://localhost:3000/api/integrations/superlist \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_SECRET_KEY" \
+  -d '{
+    "action": "SYNC_BATCH",
+    "listId": "47fc98d0-0372-44e2-a5fe-b7b81381ce4e",
+    "tasks": [
+      { "id": "250a4226-e265-4550-987f-425160c7ae6a", "title": "Task title", "listId": "47fc98d0-0372-44e2-a5fe-b7b81381ce4e" }
+    ]
+  }'
+```
+
+Tasks synced this way get canonical list-scoped links:
+
+```
+https://app.superlist.com/lists/<listId>/tasks/<taskId>
+```
+
+### 2. On-demand pull (Settings → "Sync now")
+
+The dashboard can also pull tasks from Superlist itself. Open
+**Settings → Superlist Integration → Connect to Superlist** and log in with
+your Superlist account in the browser. The dashboard registers an OAuth (PKCE)
+client against Superlist, stores the resulting tokens in the database, and
+then **Sync now** pulls open tasks from all your lists and upserts them
+(existing tasks are updated, including completion status; already-completed
+tasks are not re-created).
+
+Access tokens are refreshed automatically using the stored refresh token, so
+you only need to reconnect if you revoke access or the refresh token expires.
+Use **Reconnect** to authorize a different account and **Disconnect** to clear
+stored tokens.
+
+#### Lists map to Life OS Domains
+
+Each Superlist list is synced to a **Life OS Domain** (not a Project):
+
+- A list already linked to a domain is reused (so renames follow the list).
+- Otherwise an existing domain with the **same name** (case-insensitive) is
+  adopted and linked.
+- Otherwise a new domain is created with the list's name and a unique slug.
+
+Tasks inherit the domain of their list on sync. A domain you have manually
+reassigned a task to is preserved unless the task moves to a different list.
+Linked domains show a red **Superlist list** deep link on the Domains page, and
+the Settings panel reports how many domains are linked.
+
+> Note: matching is by exact (case-insensitive) name. A Superlist list called
+> `Home` will not automatically adopt an existing domain named `Life / Home`;
+> either rename the domain to match the list or delete/rename the list.
+
+If you prefer a static token for automated setups, you can instead set a
+Superlist MCP OAuth access token in your environment:
+
+```
+SUPERLIST_MCP_TOKEN=your_superlist_mcp_oauth_token
+```
+
+The env token is used only when no token has been stored via the in-app
+**Connect** flow, and it cannot be auto-refreshed — when it expires you must
+replace it and restart. The in-app connect flow is recommended.
+
+#### OAuth endpoints used
+
+| Purpose | Endpoint |
+| --- | --- |
+| Discovery | `https://app.superlist.com/.well-known/oauth-authorization-server` |
+| Authorize | `https://app.superlist.com/oauth/authorize` (PKCE S256) |
+| Token | `https://app.superlist.com/oauth/token` (`authorization_code` + `refresh_token`) |
+| Register | `https://app.superlist.com/oauth/register` (dynamic client registration) |
+
+---
+
 ## Local Development (Without Docker)
 
 If you have a local PostgreSQL instance running:

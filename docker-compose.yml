@@ -40,6 +40,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-lifeos_user}:${POSTGRES_PASSWORD:-change_this_secure_password_in_production}@db:5432/${POSTGRES_DB:-lifeos}?schema=public
       API_SECRET_KEY: ${API_SECRET_KEY}
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      # Superlist on-demand sync (optional)
+      SUPERLIST_MCP_TOKEN: ${SUPERLIST_MCP_TOKEN:-}
+      SUPERLIST_MCP_URL: ${SUPERLIST_MCP_URL:-https://app.superlist.com/mcp}
       # Server timezone: keeps "today" (routine schedules, streaks, dd/mm/yyyy
       # dates) aligned with your local calendar day instead of UTC.
       TZ: ${TZ:-UTC}
