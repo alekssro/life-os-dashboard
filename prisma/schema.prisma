@@ -189,11 +189,15 @@ model Routine {
   consistencyScore  Float            @default(0)   // 0-100 rolling weekly consistency
   graceDays         Int              @default(1)   // Missed days allowed before penalty
   targetPerWeek     Int              @default(7)   // Target completions per week
+  superlistId       String?          @unique       // Superlist task UUID (recurring source)
+  superlistListId   String?                        // Superlist list UUID this routine came from
+  superlistUrl      String?                        // Direct Superlist task link
   logs              RoutineLog[]
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   @@index([timeOfDay])
+  @@index([superlistListId])
   @@map("routines")
 }
 

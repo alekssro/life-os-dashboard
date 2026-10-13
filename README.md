@@ -182,6 +182,36 @@ The env token is used only when no token has been stored via the in-app
 **Connect** flow, and it cannot be auto-refreshed — when it expires you must
 replace it and restart. The in-app connect flow is recommended.
 
+#### Recurring tasks map to Life OS Routines
+
+Superlist tasks that have a **recurring due date** are synced as **Life OS
+Routines** instead of Tasks, so habits and repeating chores live on the Routines
+page. On each sync:
+
+- A recurring task upserts a Routine (matched by its Superlist task id) and any
+  Task row previously created for it is removed.
+- The first time a routine is created, its **time of day** (Morning / Afternoon
+  / Evening) is derived from the task's due time in your Superlist timezone;
+  otherwise it defaults to Morning.
+- If a task stops repeating in Superlist, its Routine is deactivated (history is
+  kept) and the task is synced normally again.
+- Routines created from Superlist show a red **Superlist** deep link on the
+  Routines page.
+
+Repeat rules are mapped best-effort onto Life OS routines, which only support
+Daily / Weekly (weekdays) / Monthly (day of month):
+
+| Superlist `repetition.type` | Life OS Routine |
+| --- | --- |
+| `daily` | Daily |
+| `weekly` | Weekly on `day_of_week` |
+| `days_of_week` | Weekly on the selected weekdays |
+| `monthly` | Monthly on `day` (0 = last day of month) |
+| `nth_weekday_of_month` | Monthly anchored to the next due date's day (approximation) |
+
+Intervals (`every > 1`, e.g. every 2 weeks or every 3 months) are not
+representable and are ignored.
+
 #### OAuth endpoints used
 
 | Purpose | Endpoint |

@@ -43,7 +43,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [calStatusMsg, setCalStatusMsg] = useState<string | null>(null);
 
   // Superlist status state
-  const [superlistInfo, setSuperlistInfo] = useState<{ totalSynced: number; openCount: number; linkedProjects: any[]; linkedDomains: any[] } | null>(null);
+  const [superlistInfo, setSuperlistInfo] = useState<{ totalSynced: number; openCount: number; linkedProjects: any[]; linkedDomains: any[]; linkedRoutines?: any[]; linkedRoutinesCount?: number } | null>(null);
   const [superlistAuth, setSuperlistAuth] = useState<{ connected: boolean; hasRefreshToken: boolean; expiresAt: number | null; envTokenConfigured: boolean } | null>(null);
   const [isSuperlistSyncing, setIsSuperlistSyncing] = useState(false);
   const [isSuperlistConnecting, setIsSuperlistConnecting] = useState(false);
@@ -450,6 +450,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <span className="text-[var(--paper-muted)]">Connected Superlist Tasks:</span>
               <span className="font-semibold text-[var(--paper-text)]">
                 {superlistInfo?.totalSynced || 0} total ({superlistInfo?.openCount || 0} open)
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-[var(--paper-muted)]">Routines from Recurring Superlist Tasks:</span>
+              <span className="font-semibold text-[var(--paper-text)]">
+                {superlistInfo?.linkedRoutinesCount || 0} routines
               </span>
             </div>
             <div className="flex items-center justify-between text-xs font-mono">

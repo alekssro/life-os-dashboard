@@ -10,6 +10,7 @@ import {
   ChevronUp,
   ChevronDown,
   Pencil,
+  ExternalLink,
 } from 'lucide-react';
 import {
   EditRoutinePanel,
@@ -297,6 +298,20 @@ export function RoutinesView() {
                         </span>
                         <div className="flex items-center gap-2 mt-0.5">
                           <FrequencyBadge routine={r} />
+                          {r.superlistUrl && (
+                            <a
+                              href={r.superlistUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-[9px] font-mono text-red-600 dark:text-red-400 hover:underline uppercase"
+                              title="Open in Superlist"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                              Superlist
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          )}
                           {!r.isDueToday && (
                             <span className="text-[9px] font-mono uppercase text-[var(--paper-muted)]/60">
                               Not scheduled today

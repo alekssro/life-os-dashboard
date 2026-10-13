@@ -76,6 +76,9 @@ export async function GET() {
       targetPerWeek: r.targetPerWeek,
       isDueToday: isDue,
       isCompletedToday: !!todaysLog?.completed,
+      superlistId: r.superlistId,
+      superlistListId: r.superlistListId,
+      superlistUrl: r.superlistUrl,
     };
   });
 

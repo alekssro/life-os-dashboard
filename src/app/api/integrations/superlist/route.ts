@@ -7,6 +7,7 @@ import { resolveSuperlistUrl } from '@/lib/superlist';
 import { pullSuperlistTasks } from '@/lib/superlistSync';
 import { resolveSuperlistAccessToken, tryRefreshStoredToken } from '@/lib/superlistOAuth';
 import { findOrCreateDomainForList, resolveDomainIdForList } from '@/lib/superlistDomains';
+import { mapRepetitionToRoutineSchedule, routineTimeOfDayFromDue } from '@/lib/superlistRoutines';
 
 /**
  * Superlist integration endpoint:
@@ -46,6 +47,22 @@ export async function GET(req: NextRequest) {
       orderBy: { order: 'asc' },
     });
 
+    const routinesWithSuperlist = await prisma.routine.findMany({
+      where: { superlistId: { not: null }, active: true },
+      select: {
+        id: true,
+        title: true,
+        timeOfDay: true,
+        frequency: true,
+        daysOfWeek: true,
+        dayOfMonth: true,
+        superlistId: true,
+        superlistListId: true,
+        superlistUrl: true,
+      },
+      orderBy: [{ timeOfDay: 'asc' }, { order: 'asc' }],
+    });
+
     const totalSynced = superlistTasks.length;
     const openCount = superlistTasks.filter((t) => t.status !== 'DONE').length;
 
@@ -56,6 +73,8 @@ export async function GET(req: NextRequest) {
       tasks: superlistTasks,
       linkedProjects: projectsWithSuperlist,
       linkedDomains: domainsWithSuperlist,
+      linkedRoutines: routinesWithSuperlist,
+      linkedRoutinesCount: routinesWithSuperlist.length,
     });
   } catch (error: any) {
     console.error('Error fetching Superlist sync status:', error);
@@ -226,7 +245,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const { tasks, lists } = pullResult;
+      const { tasks, lists, timezone } = pullResult;
 
       // Map each Superlist list to a Life OS Domain (find linked -> match by
       // name -> create). Tasks then inherit the domain of their list.
@@ -243,11 +262,73 @@ export async function POST(req: NextRequest) {
       let created = 0;
       let updated = 0;
       let skipped = 0;
+      let routinesCreated = 0;
+      let routinesUpdated = 0;
+      let routinesDeactivated = 0;
+      let tasksRemoved = 0;
 
       for (const item of tasks) {
         if (!item.title || !item.id) continue;
 
         const listDomainId = item.listId ? domainIdByListId[item.listId] ?? null : null;
+
+        // Recurring Superlist tasks ("recurring due date") are represented as
+        // Life OS Routines rather than Tasks, so they live in the Routines view
+        // instead of the task lists. Any Task row previously synced for the
+        // same Superlist task is removed.
+        if (item.repetition) {
+          const schedule = mapRepetitionToRoutineSchedule(item.repetition, item.dueDate);
+          const existingRoutine = await prisma.routine.findUnique({
+            where: { superlistId: item.id },
+          });
+
+          if (existingRoutine) {
+            await prisma.routine.update({
+              where: { superlistId: item.id },
+              data: {
+                title: item.title,
+                active: true,
+                superlistListId: item.listId,
+                superlistUrl: item.url,
+                ...(schedule
+                  ? {
+                      frequency: schedule.frequency,
+                      daysOfWeek: schedule.daysOfWeek,
+                      dayOfMonth: schedule.dayOfMonth,
+                    }
+                  : {}),
+              },
+            });
+            routinesUpdated++;
+          } else {
+            const timeOfDay = routineTimeOfDayFromDue(item.dueDate, timezone);
+            const maxOrder = await prisma.routine.findFirst({
+              where: { timeOfDay },
+              orderBy: { order: 'desc' },
+              select: { order: true },
+            });
+            await prisma.routine.create({
+              data: {
+                title: item.title,
+                timeOfDay,
+                frequency: schedule?.frequency ?? 'DAILY',
+                daysOfWeek: schedule?.daysOfWeek ?? null,
+                dayOfMonth: schedule?.dayOfMonth ?? null,
+                icon: '✨',
+                order: (maxOrder?.order ?? 0) + 1,
+                active: true,
+                superlistId: item.id,
+                superlistListId: item.listId,
+                superlistUrl: item.url,
+              },
+            });
+            routinesCreated++;
+          }
+
+          const removed = await prisma.task.deleteMany({ where: { superlistId: item.id } });
+          tasksRemoved += removed.count;
+          continue;
+        }
 
         const existing = await prisma.task.findUnique({
           where: { superlistId: item.id },
@@ -302,17 +383,38 @@ export async function POST(req: NextRequest) {
           });
           created++;
         }
+
+        // If a routine was previously created for this task and it no longer
+        // repeats in Superlist, deactivate it (keeping its logs/streak history)
+        // so the task takes over again.
+        const staleRoutine = await prisma.routine.findUnique({
+          where: { superlistId: item.id },
+          select: { id: true, active: true },
+        });
+        if (staleRoutine?.active) {
+          await prisma.routine.update({
+            where: { id: staleRoutine.id },
+            data: { active: false },
+          });
+          routinesDeactivated++;
+        }
       }
 
       const domainsUnchanged = lists.length - domainsCreated - domainsLinked;
       return NextResponse.json({
         success: true,
-        message: `Synced ${tasks.length} tasks from ${lists.length} lists (${created} created, ${updated} updated, ${skipped} completed skipped). Domains: ${domainsCreated} created, ${domainsLinked} linked, ${domainsUnchanged} unchanged.`,
+        message: `Synced ${tasks.length} tasks from ${lists.length} lists (${created} created, ${updated} updated, ${skipped} completed skipped). Routines: ${routinesCreated} created, ${routinesUpdated} updated, ${routinesDeactivated} deactivated (${tasksRemoved} tasks moved). Domains: ${domainsCreated} created, ${domainsLinked} linked, ${domainsUnchanged} unchanged.`,
         lists: lists.length,
         total: tasks.length,
         created,
         updated,
         skipped,
+        routines: {
+          created: routinesCreated,
+          updated: routinesUpdated,
+          deactivated: routinesDeactivated,
+        },
+        tasksRemoved,
         domains: {
           total: lists.length,
           created: domainsCreated,

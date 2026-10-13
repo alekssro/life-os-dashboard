@@ -11,6 +11,7 @@
  */
 
 import { buildSuperlistTaskUrl, buildSuperlistListUrl } from '@/lib/superlist';
+import type { SuperlistRepetition } from '@/lib/superlistRoutines';
 
 const PROTOCOL_VERSION = '2025-06-18';
 
@@ -25,6 +26,8 @@ export interface SuperlistTaskItem {
   priority: string; // dashboard TaskPriority
   isTop3: boolean;
   notes: string | null;
+  /** Repetition rule for recurring tasks, or null when the task does not repeat. */
+  repetition: SuperlistRepetition | null;
 }
 
 export interface SuperlistListItem {
@@ -36,6 +39,8 @@ export interface SuperlistListItem {
 export interface SuperlistPullResult {
   tasks: SuperlistTaskItem[];
   lists: SuperlistListItem[];
+  /** Resolved IANA timezone of the authenticated user, when available. */
+  timezone?: string;
 }
 
 const PRIORITY_MAP: Record<string, string> = {
@@ -177,9 +182,29 @@ export async function pullSuperlistTasks(token: string): Promise<SuperlistPullRe
   const listMeta: SuperlistListItem[] = [];
   const listsSeen: Record<string, boolean> = {};
 
+  // Resolve the user's timezone so due times map to the right time-of-day bucket.
+  let timezone: string | undefined;
+  try {
+    const whoResp = await mcpRequest(
+      url,
+      token,
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'whoami', arguments: {} },
+      },
+      init.sessionId
+    );
+    const whoData = extractToolResult(whoResp.message.result) || {};
+    timezone = whoData?.user?.timezone || whoData?.timezone || undefined;
+  } catch {
+    timezone = undefined;
+  }
+
   // 4. enumerate tasks per list
   const tasks: SuperlistTaskItem[] = [];
-  let callId = 3;
+  let callId = 4;
   for (const list of rawLists) {
     const listId = list?.uuid || null;
     if (!listId || listsSeen[listId]) continue;
@@ -216,9 +241,10 @@ export async function pullSuperlistTasks(token: string): Promise<SuperlistPullRe
         priority: PRIORITY_MAP[t.priority] || 'NORMAL',
         isTop3: false,
         notes: null,
+        repetition: t.repetition || null,
       });
     }
   }
 
-  return { tasks, lists: listMeta };
+  return { tasks, lists: listMeta, timezone };
 }
