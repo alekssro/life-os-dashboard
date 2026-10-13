@@ -168,7 +168,7 @@ export async function PATCH(req: NextRequest) {
         updateArgs.notes = updates.notes;
       }
       if (updates.dueDate !== undefined && updates.dueDate !== existing.dueDate) {
-        updateArgs.due_date = updates.dueDate ? updates.dueDate.toISOString() : null;
+        updateArgs.due_date = updates.dueDate ? updates.dueDate.toISOString().split('T')[0] : null;
       }
       if (updates.priority !== undefined && updates.priority !== existing.priority) {
         const priorityMap: Record<string, 'high' | 'normal' | 'low'> = {
