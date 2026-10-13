@@ -8,7 +8,7 @@
  */
 
 import { resolveSuperlistAccessToken, tryRefreshStoredToken } from '@/lib/superlistOAuth';
-import { completeSuperlistTask as completeSuperlistTaskWithToken } from '@/lib/superlistSync';
+import { completeSuperlistTask as completeSuperlistTaskWithToken, updateSuperlistTask as updateSuperlistTaskWithToken, type UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
 export interface SuperlistWriteResult {
   ok: boolean;
@@ -44,5 +44,32 @@ export async function pushSuperlistCompletion(taskUuid: string): Promise<Superli
       return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
     }
     return { ok: false, error: err?.message || 'Superlist completion failed' };
+  }
+}
+
+export async function pushSuperlistUpdate(taskUuid: string, args: UpdateSuperlistTaskArgs): Promise<SuperlistWriteResult> {
+  if (!taskUuid) return { ok: false, error: 'Missing Superlist task id' };
+
+  const resolved = await resolveSuperlistAccessToken();
+  if (!resolved.ok) return { ok: false, error: resolved.message };
+
+  try {
+    await updateSuperlistTaskWithToken(resolved.token, { ...args, task_uuid: taskUuid });
+    return { ok: true };
+  } catch (e) {
+    const err = e as Error & { status?: number };
+    if (err?.status === 401) {
+      const refreshed = await tryRefreshStoredToken();
+      if (refreshed) {
+        try {
+          await updateSuperlistTaskWithToken(refreshed, { ...args, task_uuid: taskUuid });
+          return { ok: true };
+        } catch (retryErr) {
+          return { ok: false, error: (retryErr as Error).message };
+        }
+      }
+      return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
+    }
+    return { ok: false, error: err?.message || 'Superlist update failed' };
   }
 }

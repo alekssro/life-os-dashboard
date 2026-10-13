@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { parseFlexibleDate } from '@/lib/date';
-import { pushSuperlistCompletion } from '@/lib/superlistWrite';
+import { pushSuperlistCompletion, pushSuperlistUpdate } from '@/lib/superlistWrite';
+import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -101,7 +102,10 @@ export async function PATCH(req: NextRequest) {
 
     const existing = await prisma.task.findUnique({
       where: { id },
-      select: { status: true, superlistId: true },
+      include: {
+        domain: true,
+        project: true,
+      },
     });
     if (!existing) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -152,7 +156,38 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(superlistPush ? { ...task, superlistPush } : task);
+    // Push other field updates to Superlist (title, notes, dueDate, priority)
+    let superlistUpdate: { ok: boolean; error?: string } | undefined;
+    if (task.superlistId && !becameDone) {
+      const updateArgs: UpdateSuperlistTaskArgs = { task_uuid: task.superlistId };
+
+      if (updates.title !== undefined && updates.title !== existing.title) {
+        updateArgs.title = updates.title;
+      }
+      if (updates.notes !== undefined && updates.notes !== existing.notes) {
+        updateArgs.notes = updates.notes;
+      }
+      if (updates.dueDate !== undefined && updates.dueDate !== existing.dueDate) {
+        updateArgs.due_date = updates.dueDate ? updates.dueDate.toISOString() : null;
+      }
+      if (updates.priority !== undefined && updates.priority !== existing.priority) {
+        const priorityMap: Record<string, 'high' | 'normal' | 'low'> = {
+          HIGH: 'high',
+          NORMAL: 'normal',
+          LOW: 'low',
+        };
+        updateArgs.priority = priorityMap[updates.priority] || 'normal';
+      }
+
+      if (Object.keys(updateArgs).length > 1) { // more than just task_uuid
+        superlistUpdate = await pushSuperlistUpdate(task.superlistId, updateArgs);
+        if (!superlistUpdate.ok) {
+          console.warn(`Superlist update push failed for task ${task.id}: ${superlistUpdate.error}`);
+        }
+      }
+    }
+
+    return NextResponse.json(superlistPush || superlistUpdate ? { ...task, superlistPush, superlistUpdate } : task);
   } catch (error) {
     console.error('Error updating task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

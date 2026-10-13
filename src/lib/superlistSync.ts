@@ -311,3 +311,29 @@ export async function completeSuperlistTask(token: string, taskUuid: string): Pr
     throw new Error(`Superlist complete_task failed: ${detail}`);
   }
 }
+
+export interface UpdateSuperlistTaskArgs {
+  task_uuid: string;
+  title?: string;
+  due_date?: string | null;
+  priority?: 'high' | 'normal' | 'low';
+  notes?: string | null;
+  repetition?: any | null;
+}
+
+/**
+ * Update a Superlist task via the MCP. Only the provided fields will be modified.
+ */
+export async function updateSuperlistTask(token: string, args: UpdateSuperlistTaskArgs): Promise<void> {
+  if (!token) throw new Error('Superlist token is not configured');
+  if (!args.task_uuid) throw new Error('Missing Superlist task id');
+
+  const result = await callSuperlistTool(token, 'update_task', args);
+
+  if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist update_task failed: ${detail}`);
+  }
+}
