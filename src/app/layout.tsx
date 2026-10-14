@@ -2,6 +2,7 @@ import { ThemeProvider } from '@/lib/theme';
 import type { Metadata } from 'next';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { SWRegistration } from '@/components/SWRegistration';
+import { BackGestureProvider } from '@/components/BackGestureProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -35,7 +36,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <ThemeProvider>
-          {children}
+          <BackGestureProvider>
+            {children}
+          </BackGestureProvider>
           <SWRegistration />
           <PWAInstallPrompt />
         </ThemeProvider>
