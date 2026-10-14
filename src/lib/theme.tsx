@@ -19,7 +19,7 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export const availableThemes: Array<{ id: ThemeType; label: string; desc: string }> = [
-  { id: 'system', label: 'System Default', desc: 'Follow OS light/dark preference' },
+  { id: 'system', label: 'System Default', desc: 'Warm Paper (light) / Midnight OLED (dark)' },
   { id: 'warm', label: 'Warm Paper', desc: 'Warm cream & terracotta' },
   { id: 'eink', label: 'E-Ink Tablet', desc: 'Pure high-contrast monochrome for Boox/Remarkable' },
   { id: 'light', label: 'Daylight', desc: 'Crisp minimal white for desktop & phone' },
@@ -36,7 +36,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resolveTheme = (t: ThemeType): 'warm' | 'eink' | 'light' | 'dark' => {
-    if (t === 'system') return getSystemTheme();
+    if (t === 'system') {
+      const systemTheme = getSystemTheme();
+      return systemTheme === 'light' ? 'warm' : 'dark';
+    }
     return t;
   };
 
