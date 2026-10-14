@@ -1,21 +1,16 @@
 'use client';
 
-import { ThemeType, useTheme } from '@/lib/theme';
 import {
   BookOpen,
   CheckSquare,
   ClipboardList,
-  Coffee,
   Flame,
   FolderKanban,
   Layers,
   Menu,
-  Moon,
   Plus,
   Repeat,
   Settings,
-  Sun,
-  Tablet,
   Users,
   X,
 } from 'lucide-react';
@@ -53,13 +48,6 @@ const moreNavItems: { id: NavItem; label: string; icon: React.ComponentType<{ cl
   { id: 'weekly-review', label: 'Weekly Review', icon: ClipboardList },
 ];
 
-const themeOptions: { id: ThemeType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'warm', label: 'Warm', icon: Coffee },
-  { id: 'eink', label: 'E-Ink', icon: Tablet },
-  { id: 'light', label: 'Light', icon: Sun },
-  { id: 'dark', label: 'Dark', icon: Moon },
-];
-
 export function BottomNav({
   currentView,
   onSelectView,
@@ -67,7 +55,6 @@ export function BottomNav({
   onOpenSettings,
   slippingCount = 0,
 }: BottomNavProps) {
-  const { theme, setTheme, availableThemes } = useTheme();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
 
@@ -83,11 +70,6 @@ export function BottomNav({
 
   const handleMoreItemClick = (view: NavItem) => {
     onSelectView(view);
-    setIsMoreOpen(false);
-  };
-
-  const handleThemeClick = (t: ThemeType) => {
-    setTheme(t);
     setIsMoreOpen(false);
   };
 
@@ -163,33 +145,6 @@ export function BottomNav({
                         >
                           <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--paper-accent)]' : ''}`} />
                           <span className="flex-1 text-left">{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="border-t border-[var(--paper-border)] mx-2" />
-
-                {/* Theme Section */}
-                <div className="p-2">
-                  <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)] px-2 py-1">Theme</p>
-                  <div className="grid grid-cols-4 gap-1">
-                    {themeOptions.map((t) => {
-                      const Icon = t.icon;
-                      const isActive = theme === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => handleThemeClick(t.id)}
-                          title={t.label}
-                          className={`flex items-center justify-center p-2 rounded border text-xs transition-colors ${
-                            isActive
-                              ? 'border-[var(--paper-accent)] bg-[var(--paper-card-subtle)] text-[var(--paper-text)]'
-                              : 'border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] hover:bg-[var(--paper-card-subtle)]'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
                         </button>
                       );
                     })}
