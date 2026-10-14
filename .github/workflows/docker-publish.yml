@@ -83,37 +83,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Attach package to GitHub Release
-        if: github.event_name == 'release' || github.event_name == 'repository_dispatch'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = "${{ steps.version.outputs.VERSION }}";
-            const tag =
-              "${{ github.event_name }}" === "release"
-                ? "${{ github.event.release.tag_name }}"
-                : `v${version}`;
-            const packageUrl = `https://ghcr.io/${{ github.repository }}`;
-
-            try {
-              const release = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag,
-              });
-
-              const packageInfo = `\n## Docker Images\n\`\`\`bash\ndocker pull ghcr.io/${{ github.repository }}:latest\ndocker pull ghcr.io/${{ github.repository }}:${version}\ndocker pull ghcr.io/${{ github.repository }}:v${version}\n\`\`\`\n\n**Package:** ${packageUrl}`;
-
-              await github.rest.repos.updateRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.data.id,
-                body: release.data.body + packageInfo,
-              });
-            } catch (error) {
-              core.warning(`Could not attach package info to release ${tag}: ${error.message}`);
-            }
-
-      - name: Output image digest
-        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
