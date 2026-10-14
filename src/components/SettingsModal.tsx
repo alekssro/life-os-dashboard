@@ -17,6 +17,11 @@ import {
   ExternalLink,
   Info,
   ListTodo,
+  Monitor,
+  Coffee,
+  Sun,
+  Moon,
+  Globe,
 } from 'lucide-react';
 import { useTheme, ThemeType } from '@/lib/theme';
 import { formatDateDDMMYYYY } from '@/lib/date';
@@ -542,20 +547,43 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {availableThemes.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTheme(t.id)}
-                className={`p-3 rounded border text-left transition-colors ${
-                  theme === t.id
-                    ? 'border-[var(--paper-accent)] bg-[var(--paper-card-subtle)] ring-1 ring-[var(--paper-accent)]'
-                    : 'border-[var(--paper-border)] hover:bg-[var(--paper-card-subtle)]'
-                }`}
-              >
-                <div className="text-xs font-bold text-[var(--paper-text)]">{t.label}</div>
-                <div className="text-[11px] text-[var(--paper-muted)] mt-0.5">{t.desc}</div>
-              </button>
-            ))}
+            {availableThemes.map((t) => {
+              let icon: React.ReactNode = <Globe className="w-4 h-4" />;
+              switch (t.id) {
+                case 'system':
+                  icon = <Monitor className="w-4 h-4" />;
+                  break;
+                case 'warm':
+                  icon = <Coffee className="w-4 h-4" />;
+                  break;
+                case 'eink':
+                  icon = <Tablet className="w-4 h-4" />;
+                  break;
+                case 'light':
+                  icon = <Sun className="w-4 h-4" />;
+                  break;
+                case 'dark':
+                  icon = <Moon className="w-4 h-4" />;
+                  break;
+              }
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`p-3 rounded border text-left transition-colors flex items-center gap-3 ${
+                    theme === t.id
+                      ? 'border-[var(--paper-accent)] bg-[var(--paper-card-subtle)] ring-1 ring-[var(--paper-accent)]'
+                      : 'border-[var(--paper-border)] hover:bg-[var(--paper-card-subtle)]'
+                  }`}
+                >
+                  <span className="text-[var(--paper-accent)]">{icon}</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-bold text-[var(--paper-text)]">{t.label}</div>
+                    <div className="text-[11px] text-[var(--paper-muted)] mt-0.5">{t.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
 
