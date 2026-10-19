@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { NavItem } from '../Sidebar';
-import { formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, toISODate } from '@/lib/date';
+import { appDayStart, formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, toISODate } from '@/lib/date';
 
 function parseTimeToMinutes(timeStr: string): number {
   const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -224,9 +224,11 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
   const openSpotsNeeded = Math.max(0, 3 - top3Tasks.length);
 
-  // Single "now" for the whole render so the heading and date maths never disagree.
-  const now = new Date();
-  const todayISOStr = toISODate(now);
+  // Single "today" for the whole render so the heading and date maths never disagree.
+  // The app day rolls over at 05:00, so between midnight and 5 AM this briefing
+  // (date, routines and Due Today/Overdue labels) still belongs to the day before.
+  const todayDate = appDayStart();
+  const todayISOStr = toISODate(todayDate);
 
   // Tap the routine (not the checkbox) to edit it inline.
   const renderRoutineRow = (r: any) => (
@@ -235,8 +237,8 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
         onClick={() => setEditingRoutineId(editingRoutineId === r.id ? null : r.id)}
         onContextMenu={(e) => {
           e.preventDefault();
-          // Right-click to log for yesterday
-          const yesterday = new Date(now);
+          // Right-click to log for the day before the one being shown
+          const yesterday = new Date(todayDate);
           yesterday.setDate(yesterday.getDate() - 1);
           toggleRoutine(r.id, r.isCompletedToday, toISODate(yesterday));
         }}
@@ -305,8 +307,11 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
           <h1 className="font-serif text-3xl font-bold tracking-tight text-[var(--paper-text)]">
             Today Briefing
           </h1>
-          <p className="text-xs font-mono text-[var(--paper-muted)] mt-1 uppercase tracking-wider">
-            {formatWeekday(now)}, {formatDateDDMMYYYY(now)}
+          <p
+            className="text-xs font-mono text-[var(--paper-muted)] mt-1 uppercase tracking-wider"
+            title="The day rolls over at 05:00"
+          >
+            {formatWeekday(todayDate)}, {formatDateDDMMYYYY(todayDate)}
           </p>
         </div>
 

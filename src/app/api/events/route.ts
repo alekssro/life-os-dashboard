@@ -2,11 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate } from '@/lib/date';
+import { appDayStart, parseFlexibleDate } from '@/lib/date';
 
 export async function GET() {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Events from the app's current day onwards (the day rolls over at 05:00).
+  const startOfToday = appDayStart();
 
   const events = await prisma.scheduleEvent.findMany({
     where: {

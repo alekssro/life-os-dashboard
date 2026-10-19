@@ -42,8 +42,37 @@ export function toISODate(date: Date | string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** Today's date in the local timezone as YYYY-MM-DD. */
-export function todayISO(): string {
+/**
+ * Hour at which the app rolls over to the next day. A "day" therefore runs from
+ * 05:00 until 04:59:59.999 of the following calendar day, so late-night sessions
+ * (past midnight) keep working on the same day until 5 AM.
+ */
+export const DAY_BOUNDARY_HOUR = 5;
+
+/**
+ * Midnight (local) of the day the app currently treats as "today".
+ * Between 00:00 and 04:59 it is yesterday's midnight.
+ */
+export function appDayStart(now: Date = new Date()): Date {
+  const d = new Date(now);
+  if (d.getHours() < DAY_BOUNDARY_HOUR) d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Today's date in the local timezone as YYYY-MM-DD, honouring the 05:00 day
+ * boundary: between midnight and 05:00 this returns yesterday's date.
+ */
+export function todayISO(now: Date = new Date()): string {
+  return toISODate(appDayStart(now));
+}
+
+/**
+ * The real calendar day as YYYY-MM-DD, unaffected by the 05:00 boundary.
+ * Use it when the user explicitly picks a date (due dates, "Today" button).
+ */
+export function realTodayISO(): string {
   return toISODate(new Date());
 }
 

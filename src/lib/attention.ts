@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { appDayStart } from './date';
 
 export interface AttentionReport {
   slippingProjects: Array<{
@@ -51,8 +52,9 @@ export interface AttentionReport {
 export async function getAttentionReport(): Promise<AttentionReport> {
   const now = new Date();
   const defaultThreshold = 14;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // The app day rolls over at 05:00, so "overdue" only starts the day after the
+  // app's current day — matching the Due Today/Overdue labels on the dashboard.
+  const todayStart = appDayStart(now);
 
   // Fetch all active projects with domain and tasks
   const activeProjects = await prisma.project.findMany({

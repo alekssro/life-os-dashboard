@@ -2,14 +2,15 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { todayISO, getWeekStart, getWeekEnd, formatDateYYYYMMDD } from '@/lib/date';
+import { appDayStart, todayISO, toISODate, getWeekStart, getWeekEnd, formatDateYYYYMMDD } from '@/lib/date';
 import { isDueToday } from '@/lib/routines';
 import { pushSuperlistCompletion } from '@/lib/superlistWrite';
 
 function calculateConsistencyScore(routine: any, logs: any[]): number {
-  const now = new Date();
-  const weekStart = getWeekStart(now);
-  const weekEnd = getWeekEnd(now);
+  // Score the week of the app's current day (rolls over at 05:00), so a
+  // late-night completion still counts against the day it belongs to.
+  const weekStart = getWeekStart(appDayStart());
+  const weekEnd = getWeekEnd(appDayStart());
 
   const dueDatesInWeek: string[] = [];
   const current = new Date(weekStart);
@@ -33,9 +34,12 @@ function calculateConsistencyScore(routine: any, logs: any[]): number {
 }
 
 export async function GET() {
-  const todayStr = todayISO();
-  const weekStartStr = formatDateYYYYMMDD(getWeekStart(new Date()));
-  const weekEndStr = formatDateYYYYMMDD(getWeekEnd(new Date()));
+  // The app day rolls over at 05:00, so between midnight and 5 AM we keep
+  // serving the previous day's routines as "today".
+  const todayDate = appDayStart();
+  const todayStr = toISODate(todayDate);
+  const weekStartStr = formatDateYYYYMMDD(getWeekStart(todayDate));
+  const weekEndStr = formatDateYYYYMMDD(getWeekEnd(todayDate));
 
   const routines = await prisma.routine.findMany({
     where: { active: true },
@@ -57,7 +61,7 @@ export async function GET() {
   });
 
   const formatted = routines.map((r) => {
-    const isDue = isDueToday(r);
+    const isDue = isDueToday(r, todayDate);
     const todaysLog = r.logs.find((l) => l.date === todayStr);
     const consistencyScore = calculateConsistencyScore(r, r.logs);
 
@@ -168,8 +172,7 @@ export async function POST(req: NextRequest) {
       });
 
       let newStreak = 0;
-      const checkDate = new Date();
-      checkDate.setHours(0, 0, 0, 0);
+      const checkDate = appDayStart();
 
       for (const log of logs) {
         const logDateObj = new Date(log.date);
@@ -186,8 +189,8 @@ export async function POST(req: NextRequest) {
 
       const newBestStreak = Math.max(newStreak, routine.bestStreak);
 
-      const weekStart = getWeekStart(new Date());
-      const weekEnd = getWeekEnd(new Date());
+      const weekStart = getWeekStart(appDayStart());
+      const weekEnd = getWeekEnd(appDayStart());
       const weekLogs = await prisma.routineLog.findMany({
         where: {
           routineId,
@@ -216,8 +219,7 @@ export async function POST(req: NextRequest) {
       });
 
       let newStreak = 0;
-      const checkDate = new Date();
-      checkDate.setHours(0, 0, 0, 0);
+      const checkDate = appDayStart();
 
       for (const log of logs) {
         const logDateObj = new Date(log.date);
@@ -232,8 +234,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const weekStart = getWeekStart(new Date());
-      const weekEnd = getWeekEnd(new Date());
+      const weekStart = getWeekStart(appDayStart());
+      const weekEnd = getWeekEnd(appDayStart());
       const weekLogs = await prisma.routineLog.findMany({
         where: {
           routineId,

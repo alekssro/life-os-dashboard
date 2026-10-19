@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatDateDDMMYYYY, parseInputToISO, toISODate, todayISO } from '@/lib/date';
+import { formatDateDDMMYYYY, parseInputToISO, toISODate, realTodayISO } from '@/lib/date';
 
 interface CalendarDateInputProps {
   value: string;
@@ -156,7 +156,8 @@ export function CalendarDateInput({
     const today = new Date();
     setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     setCalendarYear(today.getFullYear());
-    const iso = todayISO();
+    // Date picking always uses the real calendar day, never the 05:00 app day.
+    const iso = realTodayISO();
     onChange(iso);
     setText(formatDateDDMMYYYY(iso));
     setInvalid(false);
@@ -169,7 +170,7 @@ export function CalendarDateInput({
     calendarYear,
     calendarMonth.getMonth() === 0 ? 11 : calendarMonth.getMonth() - 1
   );
-  const today = todayISO();
+  const today = realTodayISO();
 
   return (
     <div className="relative" ref={calendarRef}>

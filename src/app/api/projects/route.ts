@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate } from '@/lib/date';
+import { appDayStart, parseFlexibleDate } from '@/lib/date';
 
 type ProjectHealth = 'ON_TRACK' | 'WAITING' | 'QUIET' | 'AT_RISK' | 'COMPLETED';
 
@@ -12,8 +12,10 @@ function computeProjectHealth(project: any, tasks: any[], domainSlippingThreshol
   }
 
   const now = new Date();
+  // Tasks are overdue from the day after the app's current day (05:00 boundary).
+  const todayStart = appDayStart(now);
   const overdueTasks = tasks.filter(
-    (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE'
+    (t) => t.dueDate && new Date(t.dueDate) < todayStart && t.status !== 'DONE'
   );
   const waitingTasks = tasks.filter((t) => t.status === 'WAITING');
   const daysSinceActivity = Math.floor(
