@@ -3,6 +3,11 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    // Next 14: enables src/instrumentation.ts, which boots the reminder
+    // scheduler (daily task/routine push notifications) on server start.
+    instrumentationHook: true,
+  },
   async headers() {
     return [
       {

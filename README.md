@@ -72,6 +72,10 @@ API_SECRET_KEY=your_generated_secret_token
 AI_PROVIDER=auto
 ```
 
+For web push reminders, generate VAPID keys once (`node -e "const w=require('web-push');console.log(w.generateVAPIDKeys())"`)
+and set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` in `.env` (placeholders are provided).
+Reminders are scheduled server-side and configured in Settings → Reminder Notifications.
+
 ### 2. Launch Services
 
 ```bash

@@ -22,12 +22,28 @@ import {
   Sun,
   Moon,
   Globe,
+  Bell,
 } from 'lucide-react';
 import { useTheme, ThemeType } from '@/lib/theme';
 import { formatDateDDMMYYYY } from '@/lib/date';
+import {
+  SLOT_LABELS,
+  type NotificationPrefs,
+  type ReminderSlot,
+  disablePushNotifications,
+  enablePushNotifications,
+  getNotificationPermission,
+} from '@/lib/pushClient';
 import packageJson from '../../package.json';
 
 const APP_VERSION = packageJson.version;
+
+const REMINDER_SLOTS: ReminderSlot[] = ['MORNING', 'AFTERNOON', 'EVENING'];
+const DEFAULT_SLOTS: NotificationPrefs['slots'] = {
+  MORNING: '09:00',
+  AFTERNOON: '15:00',
+  EVENING: '21:00',
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -53,6 +69,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isSuperlistSyncing, setIsSuperlistSyncing] = useState(false);
   const [isSuperlistConnecting, setIsSuperlistConnecting] = useState(false);
   const [superlistSyncMsg, setSuperlistSyncMsg] = useState<string | null>(null);
+
+  // Reminder notifications (Web Push) state
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  const [notifPushConfigured, setNotifPushConfigured] = useState(true);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [notifMsg, setNotifMsg] = useState<string | null>(null);
+  const [isNotifBusy, setIsNotifBusy] = useState(false);
 
   // Load calendars and superlist when opening
   const loadCalendars = async () => {
@@ -157,11 +180,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
+  // Reminder notifications: load prefs + browser permission state
+  const loadNotificationPrefs = async () => {
+    setNotifPermission(getNotificationPermission());
+    try {
+      const res = await fetch('/api/notifications/preferences');
+      if (res.ok) {
+        const data = await res.json();
+        setNotifPrefs(data.prefs);
+        setNotifPushConfigured(Boolean(data.pushConfigured));
+      }
+    } catch (err) {
+      console.error('Error loading notification prefs:', err);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadCalendars();
       loadSuperlistInfo();
       loadSuperlistAuth();
+      loadNotificationPrefs();
     }
   }, [isOpen]);
 
@@ -254,6 +293,72 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // ------------------------------------------------------------------------------
+  // Reminder notifications (Web Push)
+  // ------------------------------------------------------------------------------
+  const persistNotificationPrefs = async (next: NotificationPrefs): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/notifications/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return data.error || 'Failed to save reminder settings.';
+      setNotifPrefs(data.prefs ?? next);
+      setNotifPushConfigured(Boolean(data.pushConfigured));
+      return null;
+    } catch {
+      return 'Failed to save reminder settings.';
+    }
+  };
+
+  const handleToggleNotifications = async (enable: boolean) => {
+    setIsNotifBusy(true);
+    setNotifMsg(null);
+    try {
+      const slots = notifPrefs?.slots ?? DEFAULT_SLOTS;
+      if (enable) {
+        const result = await enablePushNotifications();
+        if (!result.ok) {
+          setNotifMsg(result.error || 'Could not enable notifications on this device.');
+          setNotifPermission(result.permission ?? getNotificationPermission());
+          return;
+        }
+        const error = await persistNotificationPrefs({ enabled: true, slots });
+        setNotifMsg(error ?? 'Reminders enabled — this device is subscribed.');
+      } else {
+        await disablePushNotifications();
+        const error = await persistNotificationPrefs({ enabled: false, slots });
+        setNotifMsg(error ?? 'Reminders disabled on this device.');
+      }
+      setNotifPermission(getNotificationPermission());
+    } finally {
+      setIsNotifBusy(false);
+    }
+  };
+
+  const handleSlotChange = (slot: ReminderSlot, value: string) => {
+    if (!notifPrefs) return;
+    setNotifPrefs({ ...notifPrefs, slots: { ...notifPrefs.slots, [slot]: value } });
+  };
+
+  const handleSlotSave = async () => {
+    if (!notifPrefs) return;
+    setNotifMsg(null);
+    const error = await persistNotificationPrefs(notifPrefs);
+    setNotifMsg(error ?? 'Reminder times saved.');
+  };
+
+  const notifPermissionLabel =
+    notifPermission === 'granted'
+      ? 'Allowed on this device'
+      : notifPermission === 'denied'
+      ? 'Blocked in browser settings'
+      : notifPermission === 'unsupported'
+      ? 'Not supported by this browser'
+      : 'Not enabled on this device yet';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -585,6 +690,75 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               );
             })}
           </div>
+        </section>
+
+        {/* Reminder Notifications (Web Push) */}
+        <section className="space-y-3 pt-4 border-t border-[var(--paper-border)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--paper-text)]">
+              <Bell className="w-4 h-4 text-[var(--paper-accent)]" />
+              <span>Reminder Notifications</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(notifPrefs?.enabled)}
+              disabled={isNotifBusy || !notifPrefs}
+              onClick={() => handleToggleNotifications(!notifPrefs?.enabled)}
+              className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${
+                notifPrefs?.enabled ? 'bg-[var(--paper-accent)]' : 'bg-[var(--paper-border-strong)]'
+              }`}
+              title={notifPrefs?.enabled ? 'Turn reminders off' : 'Turn reminders on'}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                  notifPrefs?.enabled ? 'translate-x-5' : ''
+                }`}
+              />
+            </button>
+          </div>
+
+          <p className="text-xs text-[var(--paper-muted)] font-serif leading-relaxed">
+            One notification per slot listing everything still pending that day. Routines follow their
+            <strong> Morning / Afternoon / Evening</strong> slot; tasks use their reminder time (or due
+            time) and default to the morning digest. The app day rolls over at 05:00, so late-night
+            reminders stay on the same day.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {REMINDER_SLOTS.map((slot) => (
+              <label
+                key={slot}
+                className="flex items-center justify-between gap-2 p-2 rounded border border-[var(--paper-border)] bg-[var(--paper-card-subtle)]"
+              >
+                <span className="text-xs font-mono text-[var(--paper-text)]">{SLOT_LABELS[slot]}</span>
+                <input
+                  type="time"
+                  value={notifPrefs?.slots[slot] ?? DEFAULT_SLOTS[slot]}
+                  onChange={(e) => handleSlotChange(slot, e.target.value)}
+                  onBlur={handleSlotSave}
+                  disabled={!notifPrefs}
+                  className="bg-[var(--paper-card)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono disabled:opacity-50"
+                  title={`${SLOT_LABELS[slot]} reminder time`}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-[var(--paper-muted)]">
+            <span>Permission: {notifPermissionLabel}</span>
+            {!notifPushConfigured && (
+              <span className="text-yellow-500">
+                Server is missing VAPID keys (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)
+              </span>
+            )}
+          </div>
+
+          {notifMsg && (
+            <p className="text-[11px] font-mono text-[var(--paper-text)] bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] rounded px-2 py-1.5">
+              {notifMsg}
+            </p>
+          )}
         </section>
 
         {/* 3. Hybrid AI Engine & Zero-AI Offline Capture */}

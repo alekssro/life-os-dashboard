@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { ensurePushSubscription } from '@/lib/pushClient';
 
 export function SWRegistration() {
   useEffect(() => {
@@ -47,6 +48,12 @@ export function SWRegistration() {
       registerSW();
     } else {
       window.addEventListener('load', registerSW);
+    }
+
+    // If this device already allowed notifications, silently (re)register it
+    // for the daily reminder push — no permission prompt is shown.
+    if ('Notification' in window && Notification.permission === 'granted') {
+      ensurePushSubscription().catch(() => {});
     }
 
     return () => {

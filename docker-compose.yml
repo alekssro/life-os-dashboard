@@ -46,6 +46,10 @@ services:
       # Server timezone: keeps "today" (routine schedules, streaks, dd/mm/yyyy
       # dates) aligned with your local calendar day instead of UTC.
       TZ: ${TZ:-UTC}
+      # Web Push reminders (empty keys disable push notifications)
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       
       # Hybrid AI Configuration
       AI_PROVIDER: ${AI_PROVIDER:-auto}

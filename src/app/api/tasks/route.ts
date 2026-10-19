@@ -4,6 +4,33 @@ import { parseFlexibleDate } from '@/lib/date';
 import { pushSuperlistCompletion, pushSuperlistUpdate } from '@/lib/superlistWrite';
 import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
+const REMINDER_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
+const REMINDER_TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+/**
+ * Reminder for the daily notification digest:
+ * 'MORNING' | 'AFTERNOON' | 'EVENING' | 'NONE' | 'HH:MM'. Anything else
+ * (including empty) becomes null → the task joins the morning digest.
+ */
+function normalizeReminder(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const upper = raw.toUpperCase();
+  if (upper === 'NONE' || REMINDER_SLOTS.includes(upper)) return upper;
+
+  const time = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (time) {
+    const hours = Number(time[1]);
+    const minutes = Number(time[2]);
+    if (hours <= 23 && minutes <= 59) {
+      return `${String(hours).padStart(2, '0')}:${time[2]}`;
+    }
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
@@ -60,6 +87,7 @@ export async function POST(req: NextRequest) {
         priority: data.priority || 'NORMAL',
         dueDate,
         dueTime: data.dueTime,
+        reminderAt: normalizeReminder(data.reminderAt),
         isTop3: Boolean(data.isTop3),
         domainId: data.domainId || null,
         projectId: data.projectId || null,
@@ -127,6 +155,10 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
       }
       updates.dueDate = parsedDueDate;
+    }
+
+    if (updates.reminderAt !== undefined) {
+      updates.reminderAt = normalizeReminder(updates.reminderAt);
     }
 
     const task = await prisma.task.update({

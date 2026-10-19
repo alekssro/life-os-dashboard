@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { CalendarDateInput } from '@/components/CalendarDateInput';
 import { toISODate } from '@/lib/date';
+import { SLOT_LABELS } from '@/lib/pushClient';
 import { buildSuperlistTaskUrl, extractSuperlistIds } from '@/lib/superlist';
 
 export const RECURRENCE_OPTIONS = [
@@ -29,6 +30,9 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
   const [recurrenceRule, setRecurrenceRule] = useState(task.recurrenceRule || '');
   const [notes, setNotes] = useState(task.notes || '');
   const [superlistUrl, setSuperlistUrl] = useState(task.superlistUrl || '');
+  // null → Morning digest; 'SLOT' | 'HH:MM' | 'NONE' otherwise.
+  const [reminderAt, setReminderAt] = useState(task.reminderAt || 'MORNING');
+  const isCustomTime = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(reminderAt);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +54,7 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
       isRecurring: Boolean(recurrenceRule),
       recurrenceRule: recurrenceRule || null,
       notes: notes.trim() || null,
+      reminderAt,
       superlistUrl: url,
       superlistId: taskId,
       superlistListId: listId,
@@ -108,6 +113,34 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Reminder (daily notification) */}
+      <div className="flex items-center gap-2">
+        <select
+          value={isCustomTime ? 'CUSTOM' : reminderAt}
+          onChange={(e) => {
+            const value = e.target.value;
+            setReminderAt(value === 'CUSTOM' ? (isCustomTime ? reminderAt : '12:00') : value);
+          }}
+          className="bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2.5 py-1 rounded border border-[var(--paper-border)] text-xs font-mono flex-1 min-w-[150px]"
+          title="When to remind about this task"
+        >
+          <option value="MORNING">Remind · {SLOT_LABELS.MORNING}</option>
+          <option value="AFTERNOON">Remind · {SLOT_LABELS.AFTERNOON}</option>
+          <option value="EVENING">Remind · {SLOT_LABELS.EVENING}</option>
+          <option value="CUSTOM">Remind · Specific time…</option>
+          <option value="NONE">No reminder</option>
+        </select>
+        {isCustomTime && (
+          <input
+            type="time"
+            value={reminderAt}
+            onChange={(e) => setReminderAt(e.target.value)}
+            className="bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono"
+            title="Exact reminder time"
+          />
+        )}
       </div>
 
       {/* Notes */}

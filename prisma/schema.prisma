@@ -105,6 +105,12 @@ model Task {
   priority       TaskPriority @default(NORMAL)
   dueDate        DateTime?
   dueTime        String?
+  // Reminder for the daily notification digest:
+  //   null            → Morning digest (09:00 by default)
+  //   'MORNING' | 'AFTERNOON' | 'EVENING' → one of the three reminder slots
+  //   'HH:MM'         → exact reminder time
+  //   'NONE'          → never remind about this task
+  reminderAt     String?
   isTop3         Boolean      @default(false)
   starOrder      Int?
   isRecurring    Boolean      @default(false)
@@ -343,4 +349,28 @@ model Setting {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+model PushSubscription {
+  id         String    @id @default(uuid())
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@map("push_subscriptions")
+}
+
+model ReminderDelivery {
+  id         String   @id @default(uuid())
+  date       String   // YYYY-MM-DD of the app day (day rolls over at 05:00)
+  key        String   // 'MORNING' | 'AFTERNOON' | 'EVENING' | 'HH:MM'
+  title      String
+  recipients Int      @default(0)
+  sentAt     DateTime @default(now())
+
+  @@unique([date, key])
+  @@map("reminder_deliveries")
 }
