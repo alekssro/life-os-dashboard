@@ -33,6 +33,7 @@ import {
   disablePushNotifications,
   enablePushNotifications,
   getNotificationPermission,
+  getServiceWorkerVersion,
 } from '@/lib/pushClient';
 import packageJson from '../../package.json';
 
@@ -72,6 +73,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   // Reminder notifications (Web Push) state
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  const [swVersion, setSwVersion] = useState<string | null>(null);
   const [notifPushConfigured, setNotifPushConfigured] = useState(true);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [notifMsg, setNotifMsg] = useState<string | null>(null);
@@ -204,6 +206,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       loadSuperlistInfo();
       loadSuperlistAuth();
       loadNotificationPrefs();
+      // Which service worker build is this device actually running?
+      getServiceWorkerVersion().then(setSwVersion).catch(() => setSwVersion(null));
     }
   }, [isOpen]);
 
@@ -772,7 +776,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <span>
               Permission: {notifPermissionLabel}
               {notifDevices > 0 ? ` · ${notifDevices} device(s) registered` : ' · no devices registered'}
+              {swVersion ? ` · Worker: ${swVersion}` : ''}
             </span>
+            {swVersion === null && (
+              <span className="text-yellow-500">
+                Service worker outdated — close and reopen the app to update it.
+              </span>
+            )}
             {!notifPushConfigured && (
               <span className="text-yellow-500">
                 Server is missing VAPID keys (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)

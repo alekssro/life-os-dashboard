@@ -1,6 +1,9 @@
-const CACHE_NAME = 'life-os-v1';
+const CACHE_NAME = 'life-os-v2';
 const OFFLINE_URL = '/offline.html';
 const API_CACHE_NAME = 'life-os-api-v1';
+// Bumped on every sw.js change so Settings can show whether the installed
+// worker is up to date ("close and reopen the app to update" otherwise).
+const SW_VERSION = 'v1.9.3';
 
 const STATIC_ASSETS = [
   '/',
@@ -103,6 +106,21 @@ async function handleRequest(request) {
       return handleMutation(request);
     }
     return fetchWithStaleWhileRevalidate(request);
+  }
+
+  // Any other /api/* endpoint (notifications, calendar, capture…) must always
+  // hit the network. These used to fall through to fetchWithCacheFirst, which
+  // froze the first response forever — e.g. the Settings notification toggle
+  // read a stale preferences snapshot and appeared not to stick.
+  if (url.pathname.startsWith('/api/')) {
+    try {
+      return await fetch(request);
+    } catch {
+      return new Response(JSON.stringify({ error: 'Offline' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   if (request.mode === 'navigate') {
@@ -235,6 +253,9 @@ function notifyClients(type, data) {
 self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'lifeos-sw-version' && event.ports[0]) {
+    event.ports[0].postMessage({ version: SW_VERSION });
   }
 });
 
