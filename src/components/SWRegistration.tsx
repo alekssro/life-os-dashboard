@@ -53,7 +53,13 @@ export function SWRegistration() {
     // If this device already allowed notifications, silently (re)register it
     // for the daily reminder push — no permission prompt is shown.
     if ('Notification' in window && Notification.permission === 'granted') {
-      ensurePushSubscription().catch(() => {});
+      ensurePushSubscription()
+        .then((result) => {
+          if (!result.ok) {
+            console.warn('[push] silent re-subscribe skipped:', result.error || result.permission);
+          }
+        })
+        .catch((error) => console.warn('[push] silent re-subscribe failed:', error));
     }
 
     return () => {

@@ -248,8 +248,11 @@ export async function dispatchDueReminders(
     return { sent: 0, moments: 0 };
   }
 
+  // No early return when there are no subscriptions: the in-app digest and the
+  // delivery bookkeeping must keep working so reminders still show up under
+  // Today → Notifications (and so a device that subscribes later cannot get a
+  // stale burst of already-consumed moments).
   const subscriptions = await prisma.pushSubscription.findMany();
-  if (subscriptions.length === 0) return { sent: 0, moments: 0 };
 
   const dayStart = appDayStart(now);
   const date = toISODate(dayStart);
@@ -347,17 +350,34 @@ export async function dispatchDueReminders(
   const ordered = Array.from(moments.values()).sort((a, b) => a.minutes - b.minutes);
   let sent = 0;
 
+  // A moment is only delivered up to 60 minutes after its scheduled time
+  // (covers a server restart or a missed tick). Anything older is consumed
+  // silently so it can never fire as a stale burst later in the day.
+  const CATCH_UP_WINDOW_MINUTES = 60;
+
   for (const moment of ordered) {
     if (moment.minutes > nowMinutes) continue;
+
+    const slotLabel = REMINDER_SLOTS.includes(moment.key as ReminderSlot)
+      ? SLOT_LABELS[moment.key as ReminderSlot]
+      : undefined;
 
     const already = await prisma.reminderDelivery.findUnique({
       where: { date_key: { date, key: moment.key } },
     });
     if (already) continue;
 
-    const slotLabel = REMINDER_SLOTS.includes(moment.key as ReminderSlot)
-      ? SLOT_LABELS[moment.key as ReminderSlot]
-      : undefined;
+    const lateMinutes = nowMinutes - moment.minutes;
+    if (lateMinutes > CATCH_UP_WINDOW_MINUTES) {
+      console.log(
+        `[reminders] ${slotLabel || moment.key} moment is ${lateMinutes} min late — consuming without sending`
+      );
+      await prisma.reminderDelivery.create({
+        data: { date, key: moment.key, title: `${slotLabel || moment.key} · skipped (late)`, recipients: 0 },
+      });
+      continue;
+    }
+
     const payload = buildPayload(moment, date, slotLabel);
 
     // Consume the moment even when there is nothing pending, so it never fires
@@ -381,6 +401,9 @@ export async function dispatchDueReminders(
       update: { title: payload.title, recipients, sentAt: new Date() },
     });
 
+    console.log(
+      `[reminders] dispatched "${payload.title}" to ${recipients}/${subscriptions.length} device(s)`
+    );
     if (recipients > 0) sent += 1;
   }
 
@@ -409,6 +432,7 @@ async function sendToAll(
     } catch (error: any) {
       // 404/410 = subscription expired or revoked by the browser.
       if (error?.statusCode === 404 || error?.statusCode === 410) {
+        console.warn(`[reminders] removing expired subscription ${subscription.endpoint.slice(0, 48)}…`);
         await deletePushSubscription(subscription.endpoint);
         continue;
       }
@@ -417,4 +441,47 @@ async function sendToAll(
   }
 
   return delivered;
+}
+
+/**
+ * Send an immediate test push to every registered device. Used from
+ * Settings → Reminder Notifications to verify the whole chain end-to-end
+ * (VAPID → push service → service worker → notification).
+ */
+export async function sendTestReminder(): Promise<{ ok: boolean; recipients: number; error?: string }> {
+  const vapid = getVapidConfig();
+  if (!vapid) {
+    return { ok: false, recipients: 0, error: 'The server is missing its VAPID keys (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY).' };
+  }
+
+  try {
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+  } catch (error) {
+    console.error('[reminders] invalid VAPID configuration:', error);
+    return { ok: false, recipients: 0, error: 'Invalid VAPID configuration on the server.' };
+  }
+
+  const subscriptions = await prisma.pushSubscription.findMany();
+  if (subscriptions.length === 0) {
+    return {
+      ok: false,
+      recipients: 0,
+      error: 'No devices are registered. Turn Reminder Notifications on in a browser first (and allow the permission).',
+    };
+  }
+
+  const payload: ReminderPayload = {
+    title: 'LifeOS test reminder',
+    body: 'Push notifications are working on this device. 🎉',
+    tag: 'lifeos-test',
+    url: '/',
+  };
+
+  const recipients = await sendToAll(subscriptions, payload);
+  console.log(`[reminders] test push delivered to ${recipients}/${subscriptions.length} device(s)`);
+
+  if (recipients === 0) {
+    return { ok: false, recipients: 0, error: 'The server could not reach any registered device — check the server logs.' };
+  }
+  return { ok: true, recipients };
 }

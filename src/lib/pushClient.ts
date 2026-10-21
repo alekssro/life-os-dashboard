@@ -41,6 +41,15 @@ function urlBase64ToUint8Array(base64String: string): BufferSource {
   return outputArray;
 }
 
+const SW_READY_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 async function getServerConfig(): Promise<{ publicKey: string | null; pushConfigured: boolean }> {
   const res = await fetch('/api/notifications/preferences');
   if (!res.ok) throw new Error('Could not load notification settings.');
@@ -53,6 +62,18 @@ async function getServerConfig(): Promise<{ publicKey: string | null; pushConfig
  * false (silent re-subscribe on page load for an already-granted permission).
  */
 async function syncSubscription(requestPermission: boolean): Promise<PushResult> {
+  // Web Push only works in a secure context (HTTPS or localhost). Over plain
+  // http://<lan-ip> the browser hides serviceWorker/PushManager entirely, so
+  // say exactly that instead of the misleading "not supported".
+  if (typeof window !== 'undefined' && 'isSecureContext' in window && !window.isSecureContext) {
+    return {
+      ok: false,
+      permission: 'unsupported',
+      error:
+        'Push notifications require HTTPS. Open the app via https:// (or http://localhost) — browsers block push on plain http:// addresses.',
+    };
+  }
+
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     return { ok: false, error: 'Push notifications are not supported in this browser.', permission: 'unsupported' };
   }
@@ -83,7 +104,13 @@ async function syncSubscription(requestPermission: boolean): Promise<PushResult>
       };
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    // .ready hangs forever if the service worker never activates (e.g. its
+    // install failed) — bound it so the toggle reports a real error.
+    const registration = await withTimeout(
+      navigator.serviceWorker.ready,
+      SW_READY_TIMEOUT_MS,
+      'The service worker did not start. Reload the page and try again.'
+    );
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({

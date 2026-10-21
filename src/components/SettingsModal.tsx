@@ -76,6 +76,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [notifMsg, setNotifMsg] = useState<string | null>(null);
   const [isNotifBusy, setIsNotifBusy] = useState(false);
+  const [notifDevices, setNotifDevices] = useState<number>(0);
+  const [isNotifTestBusy, setIsNotifTestBusy] = useState(false);
 
   // Load calendars and superlist when opening
   const loadCalendars = async () => {
@@ -189,6 +191,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         const data = await res.json();
         setNotifPrefs(data.prefs);
         setNotifPushConfigured(Boolean(data.pushConfigured));
+        if (typeof data.subscriptionCount === 'number') setNotifDevices(data.subscriptionCount);
       }
     } catch (err) {
       console.error('Error loading notification prefs:', err);
@@ -334,8 +337,28 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setNotifMsg(error ?? 'Reminders disabled on this device.');
       }
       setNotifPermission(getNotificationPermission());
+      // Refresh the registered-device count shown in the UI.
+      loadNotificationPrefs().catch(() => {});
     } finally {
       setIsNotifBusy(false);
+    }
+  };
+
+  const handleSendTestNotification = async () => {
+    setIsNotifTestBusy(true);
+    setNotifMsg(null);
+    try {
+      const res = await fetch('/api/notifications/test', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      setNotifMsg(
+        res.ok
+          ? `Test notification sent to ${data.recipients} device(s). Check this browser.`
+          : data.error || 'Failed to send the test notification.'
+      );
+    } catch {
+      setNotifMsg('Failed to send the test notification.');
+    } finally {
+      setIsNotifTestBusy(false);
     }
   };
 
@@ -746,10 +769,35 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-[var(--paper-muted)]">
-            <span>Permission: {notifPermissionLabel}</span>
+            <span>
+              Permission: {notifPermissionLabel}
+              {notifDevices > 0 ? ` · ${notifDevices} device(s) registered` : ' · no devices registered'}
+            </span>
             {!notifPushConfigured && (
               <span className="text-yellow-500">
                 Server is missing VAPID keys (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY)
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSendTestNotification}
+              disabled={isNotifTestBusy || !notifPushConfigured}
+              className="px-3 py-1.5 text-xs font-mono rounded border border-[var(--paper-border-strong)] bg-[var(--paper-card-subtle)] text-[var(--paper-text)] hover:bg-[var(--paper-card)] transition-colors disabled:opacity-50"
+              title="Send an immediate push to every registered device"
+            >
+              {isNotifTestBusy ? 'Sending…' : 'Send test notification'}
+            </button>
+            {typeof window !== 'undefined' && !window.isSecureContext && (
+              <span className="text-xs font-mono text-red-500">
+                HTTPS required: browsers block push on plain http:// addresses.
+              </span>
+            )}
+            {typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent) && (
+              <span className="text-xs font-mono text-[var(--paper-muted)]">
+                iOS: install the app to your Home Screen (Share → Add to Home Screen) for push to work.
               </span>
             )}
           </div>
