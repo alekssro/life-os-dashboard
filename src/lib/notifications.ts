@@ -422,7 +422,9 @@ async function sendToAll(
       await webpush.sendNotification(
         { endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } },
         body,
-        { TTL: 6 * 60 * 60, urgency: 'normal' }
+        // High urgency: Android delays/defers 'normal' pushes under battery
+        // optimizations, which silently breaks time-sensitive reminders.
+        { TTL: 6 * 60 * 60, urgency: 'high' }
       );
       delivered += 1;
       await prisma.pushSubscription.updateMany({
