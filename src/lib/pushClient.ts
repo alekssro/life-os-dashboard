@@ -30,33 +30,6 @@ export function getNotificationPermission(): NotificationPermission | 'unsupport
   return Notification.permission;
 }
 
-/**
- * Ask the active service worker for its self-reported version (SW_VERSION in
- * public/sw.js). Returns null when the worker is old (no handler yet), has not
- * activated, or does not answer within 3s — Settings then shows a hint to
- * reopen the app so the browser installs the newer worker.
- */
-export async function getServiceWorkerVersion(): Promise<string | null> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
-  try {
-    const registration = await navigator.serviceWorker.getRegistration();
-    const worker = registration?.active ?? navigator.serviceWorker.controller;
-    if (!worker || !('MessageChannel' in window)) return null;
-
-    return await new Promise<string | null>((resolve) => {
-      const channel = new MessageChannel();
-      const timer = setTimeout(() => resolve(null), 3000);
-      channel.port1.onmessage = (event) => {
-        clearTimeout(timer);
-        resolve(typeof event.data?.version === 'string' ? event.data.version : null);
-      };
-      worker.postMessage({ type: 'lifeos-sw-version' }, [channel.port2]);
-    });
-  } catch {
-    return null;
-  }
-}
-
 function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');

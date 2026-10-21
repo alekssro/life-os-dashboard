@@ -1,9 +1,6 @@
 const CACHE_NAME = 'life-os-v2';
 const OFFLINE_URL = '/offline.html';
 const API_CACHE_NAME = 'life-os-api-v1';
-// Bumped on every sw.js change so Settings can show whether the installed
-// worker is up to date ("close and reopen the app to update" otherwise).
-const SW_VERSION = 'v1.9.3';
 
 const STATIC_ASSETS = [
   '/',
@@ -253,9 +250,6 @@ function notifyClients(type, data) {
 self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
-  }
-  if (event.data && event.data.type === 'lifeos-sw-version' && event.ports[0]) {
-    event.ports[0].postMessage({ version: SW_VERSION });
   }
 });
 
