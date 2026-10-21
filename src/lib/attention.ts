@@ -155,10 +155,13 @@ export async function getAttentionReport(): Promise<AttentionReport> {
     });
 
   // 3. Overdue Tasks
+  // Statuses must match the project-level overdue check above (WAITING included),
+  // otherwise a waiting task with a past due date is counted for a project but
+  // missing from the flat list the dashboard renders.
   const overdue = await prisma.task.findMany({
     where: {
       status: {
-        in: ['TODO', 'IN_PROGRESS'],
+        in: ['TODO', 'IN_PROGRESS', 'WAITING'],
       },
       dueDate: {
         lt: todayStart,

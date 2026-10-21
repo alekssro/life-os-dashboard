@@ -151,6 +151,28 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
     });
   };
 
+  // Completing a task from the At Risk list has to refresh `attention` too,
+  // not just `tasks` — the overdue list lives in the attention report.
+  const completeOverdueTask = async (overdue: any) => {
+    setAttention((prev: any) =>
+      prev ? { ...prev, overdueTasks: prev.overdueTasks.filter((t: any) => t.id !== overdue.id) } : prev
+    );
+    setTasks((prev) => prev.map((t) => (t.id === overdue.id ? { ...t, status: 'DONE' } : t)));
+
+    const res = await fetch('/api/tasks', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: overdue.id, status: 'DONE' }),
+    });
+    if (!res.ok) {
+      // Roll back the optimistic removal so the task reappears in At Risk.
+      setAttention((prev: any) =>
+        prev ? { ...prev, overdueTasks: [overdue, ...(prev.overdueTasks ?? [])] } : prev
+      );
+      setTasks((prev) => prev.map((t) => (t.id === overdue.id ? { ...t, status: 'TODO' } : t)));
+    }
+  };
+
 // Routine action with backdating support
   const toggleRoutine = async (routineId: string, currentCompleted: boolean, logDate?: string) => {
     const nextVal = !currentCompleted;
@@ -680,13 +702,46 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             </div>
 
             <div className="space-y-3">
-              {/* At Risk - Overdue tasks */}
-              {attention?.atRiskProjects?.length > 0 && (
+              {/* At Risk - Overdue tasks (standalone tasks + projects with overdue work) */}
+              {(attention?.atRiskProjects?.length > 0 || attention?.overdueTasks?.length > 0) && (
                 <div>
                   <h3 className="text-[10px] font-mono uppercase text-red-500 tracking-wider mb-1.5">
                     At Risk
                   </h3>
                   <div className="space-y-2">
+                    {(attention?.overdueTasks ?? []).map((t: any) => (
+                      <div
+                        key={t.id}
+                        className="p-3 rounded border border-red-500/40 bg-red-500/10"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            <button
+                              onClick={() => completeOverdueTask(t)}
+                              className="mt-0.5 text-[var(--paper-muted)] hover:text-[var(--paper-accent)] shrink-0"
+                              title="Mark as done"
+                            >
+                              <Square className="w-4 h-4" />
+                            </button>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-[var(--paper-text)] leading-snug">
+                                {t.title}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <span className="text-[10px] font-mono text-red-500 uppercase font-semibold">
+                                  {formatDateDDMMYYYY(t.dueDate)} · {t.daysOverdue}d overdue
+                                </span>
+                                {t.domainName && (
+                                  <span className="text-[10px] font-mono text-[var(--paper-muted)] uppercase">
+                                    Domain: {t.domainName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                     {attention.atRiskProjects.map((p: any) => (
                       <div
                         key={p.id}
@@ -805,7 +860,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                 </div>
               )}
 
-              {(!attention?.atRiskProjects?.length && !attention?.waitingProjects?.length && !attention?.quietProjects?.length && !attention?.slippingProjects?.length) && (
+              {(!attention?.overdueTasks?.length && !attention?.atRiskProjects?.length && !attention?.waitingProjects?.length && !attention?.quietProjects?.length && !attention?.slippingProjects?.length) && (
                 <p className="text-xs text-[var(--paper-muted)] leading-relaxed font-serif">
                   Nothing needs attention. Projects that go quiet, have overdue tasks, or are waiting on others will surface here.
                 </p>
