@@ -10,7 +10,6 @@ import {
   Sun,
   Sunset,
   Moon,
-  Pencil,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { toISODate, formatDateYYYYMMDD, appDayStart } from '@/lib/date';
@@ -159,17 +158,6 @@ export function HabitTracker({
             >
               {routine.icon} {routine.title}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (onEditHabit) onEditHabit(routine.id);
-                else setModalEditingId(routine.id);
-              }}
-              className="text-[var(--paper-muted)] hover:text-[var(--paper-text)] p-0.5 opacity-60 hover:opacity-100 transition"
-              title="Edit habit"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-mono shrink-0">

@@ -70,12 +70,12 @@ export function TaskHub({
 
       {/* Top Priorities Section (Never Collapsed) */}
       {top3Tasks.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--paper-accent)]">
             <Star className="w-3.5 h-3.5 fill-current" />
             Top Priorities ({top3Tasks.length})
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {top3Tasks.map((task) => (
               <TaskItem
                 key={task.id}
@@ -89,7 +89,7 @@ export function TaskHub({
       )}
 
       {/* Other Open Tasks Section with Collapse Toggle */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -115,7 +115,7 @@ export function TaskHub({
                 No active tasks for current focus context.
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {otherOpenTasks.map((task) => (
                   <TaskItem
                     key={task.id}
@@ -136,7 +136,7 @@ export function TaskHub({
           <summary className="cursor-pointer hover:text-[var(--paper-text)] font-medium">
             Completed ({completedTasks.length})
           </summary>
-          <div className="mt-2 space-y-1 opacity-70">
+          <div className="mt-2 space-y-2 opacity-70">
             {completedTasks.slice(0, 5).map((task) => (
               <TaskItem
                 key={task.id}
@@ -171,7 +171,7 @@ function TaskItem({
   return (
     <div
       onClick={onEdit}
-      className={`group flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+      className={`group flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all cursor-pointer ${
         isDone
           ? 'bg-[var(--paper-card-subtle)] border-[var(--paper-border)] text-[var(--paper-muted)] line-through'
           : 'bg-[var(--paper-card)] border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] text-[var(--paper-text)] shadow-xs'
