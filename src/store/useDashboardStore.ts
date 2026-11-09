@@ -223,14 +223,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         throw new Error(`Habit update failed with status ${res.status}`);
       }
 
-      // Re-fetch routines quietly to get exact server-recalculated streaks & consistency score
-      const freshRes = await fetch('/api/routines');
-      if (freshRes.ok) {
-        const data = await freshRes.json();
-        if (data?.routines) {
-          set({ routines: data.routines });
-        }
-      }
+      // Re-fetch routines and history quietly to get exact server state
+      await Promise.all([
+        get().loadHabitHistory(),
+        fetch('/api/routines')
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.routines) set({ routines: data.routines });
+          }),
+      ]);
       return true;
     } catch (err) {
       console.error('Failed to toggle habit, rolling back:', err);

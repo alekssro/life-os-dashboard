@@ -141,17 +141,7 @@ export async function POST(req: NextRequest) {
     const isDue = isDueToday(routine, new Date(targetDate));
     const graceDays = routine.graceDays ?? 1;
 
-    if (completed && !isDue) {
-      const lastDueDate = getLastDueDate(routine, new Date(targetDate));
-      const daysSinceDue = lastDueDate ? Math.floor((new Date(targetDate).getTime() - lastDueDate.getTime()) / (1000 * 60 * 60 * 24)) : 999;
-
-      if (daysSinceDue > graceDays) {
-        return NextResponse.json(
-          { error: `${routine.title} was not scheduled for ${targetDate} (grace period: ${graceDays} day${graceDays !== 1 ? 's' : ''})` },
-          { status: 400 }
-        );
-      }
-    }
+    // Allow logging past or scheduled dates without rejecting ad-hoc / historical edits
 
     // Snapshot the current log so we can tell a fresh completion from a repeat.
     const existingLog = await prisma.routineLog.findUnique({

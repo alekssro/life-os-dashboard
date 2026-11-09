@@ -10,17 +10,19 @@ import {
   Sun,
   Sunset,
   Moon,
-  Sparkles,
+  Pencil,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { toISODate, formatDateYYYYMMDD, appDayStart } from '@/lib/date';
 import { Routine } from '@/types';
+import { EditRoutinePanel } from '@/components/EditRoutinePanel';
 
 interface HabitTrackerProps {
   title?: string;
   isTodayOnly?: boolean; // When true, filters habits strictly to those due today
   allowYearlyView?: boolean; // When false, only WEEK and MONTH are allowed
   showControls?: boolean;
+  onEditHabit?: (habitId: string) => void;
 }
 
 export function HabitTracker({
@@ -28,6 +30,7 @@ export function HabitTracker({
   isTodayOnly = false,
   allowYearlyView = false,
   showControls = true,
+  onEditHabit,
 }: HabitTrackerProps) {
   const routines = useDashboardStore((s) => s.routines);
   const habitHistory = useDashboardStore((s) => s.habitHistory);
@@ -37,6 +40,9 @@ export function HabitTracker({
   const setGlobalViewMode = useDashboardStore((s) => s.setHabitViewMode);
   const toggleHabitOptimistic = useDashboardStore((s) => s.toggleHabitOptimistic);
   const loadHabitHistory = useDashboardStore((s) => s.loadHabitHistory);
+  const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
+
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
 
   const todayStr = useMemo(() => toISODate(appDayStart()), []);
 
@@ -97,6 +103,16 @@ export function HabitTracker({
     setSelectedDate(formatDateYYYYMMDD(curr));
   };
 
+  const handleSaveInlineEdit = async (id: string, updates: any) => {
+    await fetch('/api/routines', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    });
+    setInlineEditingId(null);
+    fetchDashboardData();
+  };
+
   // Filter routines if isTodayOnly is requested
   const visibleRoutines = useMemo(() => {
     if (!isTodayOnly) return routines;
@@ -114,13 +130,15 @@ export function HabitTracker({
         ? !!routine.isCompletedToday
         : !!habitHistory[routine.id]?.[selectedDate];
 
+    const isEditingThis = inlineEditingId === routine.id;
+
     return (
       <div
         key={routine.id}
         className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2 hover:border-[var(--paper-border-strong)] transition"
       >
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => toggleHabitOptimistic(routine.id, selectedDate)}
@@ -133,9 +151,27 @@ export function HabitTracker({
                 <Square className="w-4 h-4" />
               )}
             </button>
-            <span className="text-xs sm:text-sm font-medium text-[var(--paper-text)] truncate">
+            <span
+              onClick={() => {
+                if (onEditHabit) onEditHabit(routine.id);
+                else setInlineEditingId(isEditingThis ? null : routine.id);
+              }}
+              className="text-xs sm:text-sm font-medium text-[var(--paper-text)] truncate cursor-pointer hover:text-[var(--paper-accent)] transition"
+              title="Click to edit habit"
+            >
               {routine.icon} {routine.title}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (onEditHabit) onEditHabit(routine.id);
+                else setInlineEditingId(isEditingThis ? null : routine.id);
+              }}
+              className="text-[var(--paper-muted)] hover:text-[var(--paper-text)] p-0.5 opacity-60 hover:opacity-100 transition"
+              title="Edit habit"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-mono shrink-0">
@@ -184,47 +220,62 @@ export function HabitTracker({
         {/* View Mode: YEAR multi-line GitHub commit matrix (7 rows Mon-Sun, 52 cols) */}
         {activeViewMode === 'YEAR' && yearlyGrid && (
           <div className="pt-1.5 overflow-x-auto">
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1.5">
+              {/* Day Labels precisely matched to the 7 rows */}
               <div className="flex flex-col gap-1 pr-1 text-[8px] font-mono text-[var(--paper-muted)] select-none">
-                <span>M</span>
-                <span>T</span>
-                <span>W</span>
-                <span>T</span>
-                <span>F</span>
-                <span>S</span>
-                <span>S</span>
+                <span className="h-2.5 flex items-center leading-none">M</span>
+                <span className="h-2.5 flex items-center leading-none">T</span>
+                <span className="h-2.5 flex items-center leading-none">W</span>
+                <span className="h-2.5 flex items-center leading-none">T</span>
+                <span className="h-2.5 flex items-center leading-none">F</span>
+                <span className="h-2.5 flex items-center leading-none">S</span>
+                <span className="h-2.5 flex items-center leading-none">S</span>
               </div>
-              <div className="grid grid-flow-col grid-rows-7 gap-1">
-                {yearlyGrid.flatMap((week) =>
-                  week.map((dStr) => {
-                    const isDone =
-                      dStr === todayStr
-                        ? !!routine.isCompletedToday
-                        : !!habitHistory[routine.id]?.[dStr];
-                    const isSelected = dStr === selectedDate;
+              {/* 52-week columns, each exactly 7 items arranged vertically */}
+              <div className="flex items-start gap-1">
+                {yearlyGrid.map((week, wIdx) => (
+                  <div key={wIdx} className="flex flex-col gap-1">
+                    {week.map((dStr) => {
+                      const isDone =
+                        dStr === todayStr
+                          ? !!routine.isCompletedToday
+                          : !!habitHistory[routine.id]?.[dStr];
+                      const isSelected = dStr === selectedDate;
 
-                    return (
-                      <button
-                        key={dStr}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDate(dStr);
-                          toggleHabitOptimistic(routine.id, dStr);
-                        }}
-                        title={`${dStr}: ${isDone ? 'Completed' : 'Missed'}`}
-                        className={`w-2.5 h-2.5 rounded-xs transition-all border ${
-                          isSelected ? 'ring-1 ring-[var(--paper-accent)]' : ''
-                        } ${
-                          isDone
-                            ? 'bg-[var(--paper-accent)] border-[var(--paper-accent)]'
-                            : 'bg-[var(--paper-card)] border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
-                        }`}
-                      />
-                    );
-                  })
-                )}
+                      return (
+                        <button
+                          key={dStr}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDate(dStr);
+                            toggleHabitOptimistic(routine.id, dStr);
+                          }}
+                          title={`${dStr}: ${isDone ? 'Completed' : 'Missed'} (Click to toggle)`}
+                          className={`w-2.5 h-2.5 rounded-xs transition-all border block ${
+                            isSelected ? 'ring-1 ring-[var(--paper-accent)]' : ''
+                          } ${
+                            isDone
+                              ? 'bg-[var(--paper-accent)] border-[var(--paper-accent)]'
+                              : 'bg-[var(--paper-card)] border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Inline Edit Panel when expanded */}
+        {isEditingThis && (
+          <div className="mt-2 pt-2 border-t border-[var(--paper-border)]">
+            <EditRoutinePanel
+              routine={routine}
+              onSave={(updates) => handleSaveInlineEdit(routine.id, updates)}
+              onCancel={() => setInlineEditingId(null)}
+            />
           </div>
         )}
       </div>
