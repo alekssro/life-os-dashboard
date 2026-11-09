@@ -31,7 +31,10 @@ export function EditRoutineModal({
   if (!isOpen || !routine) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+      onClick={onClose}
+    >
       <div
         className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-2xl p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
