@@ -73,6 +73,20 @@ export function RoutinesView() {
             Track daily, weekly and monthly streaks across GitHub-style heatmap matrices
           </p>
         </div>
+
+        <button
+          onClick={() => {
+            const formElem = document.getElementById('new-habit-input');
+            if (formElem) {
+              formElem.focus();
+              formElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--paper-accent)] text-white text-xs font-semibold hover:opacity-90 transition shadow-xs"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Habit</span>
+        </button>
       </div>
 
       {/* Main Habit Tracker with full Yearly multi-line GitHub commit grid enabled */}
@@ -94,6 +108,7 @@ export function RoutinesView() {
         <form onSubmit={handleCreateRoutine} className="space-y-3 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
             <input
+              id="new-habit-input"
               type="text"
               placeholder="Habit title (e.g. Read 20 pages, Gym, Meditate)..."
               value={newTitle}

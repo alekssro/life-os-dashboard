@@ -213,7 +213,7 @@ export function CaptureModal({ isOpen, onClose, onCaptured }: CaptureModalProps)
   const typeTabs: Array<{ id: CaptureType; label: string; icon: any }> = [
     { id: 'AUTO', label: 'Auto (AI/Rule)', icon: Sparkles },
     { id: 'TASK', label: 'Task', icon: CheckSquare },
-    { id: 'ROUTINE', label: 'Routine', icon: Repeat },
+    { id: 'ROUTINE', label: 'Habit', icon: Repeat },
     { id: 'PROJECT', label: 'Project', icon: FolderKanban },
     { id: 'PERSON', label: 'Person', icon: Users },
     { id: 'QUOTE', label: 'Quote', icon: BookOpen },

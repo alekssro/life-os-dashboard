@@ -41,14 +41,6 @@ export function TasksView() {
             All tasks synchronized across Superlist & Local OS
           </p>
         </div>
-
-        <button
-          onClick={() => setIsCaptureOpen(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--paper-accent)] text-white text-xs font-semibold hover:opacity-90 transition"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Task</span>
-        </button>
       </div>
 
       {/* Primary Task Hub matching Today View and respecting active Focus Mode */}
