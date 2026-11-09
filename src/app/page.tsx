@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
+import { TopBar } from '@/components/TopBar';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TasksView } from '@/components/views/TasksView';
 import { RoutinesView } from '@/components/views/RoutinesView';
@@ -13,6 +14,7 @@ import { DomainsView } from '@/components/views/DomainsView';
 import { WeeklyReviewView } from '@/components/views/WeeklyReviewView';
 import { CaptureModal } from '@/components/CaptureModal';
 import { SettingsModal } from '@/components/SettingsModal';
+import { useSuperlistSync } from '@/hooks/useSuperlistSync';
 
 export default function HomePage() {
   const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'projects' | 'people' | 'library' | 'domains' | 'weekly-review'>('today');
@@ -20,7 +22,9 @@ export default function HomePage() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [slippingCount, setSlippingCount] = useState(0);
-  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Initialize background polling & visibility management
+  const { syncNow } = useSuperlistSync();
 
   // Global keyboard shortcut (⌘J or ⌘K)
   useEffect(() => {
@@ -44,10 +48,9 @@ export default function HomePage() {
         }
       })
       .catch(() => {});
-  }, [refreshKey]);
+  }, []);
 
-  // After a Superlist OAuth login redirect, re-open the settings modal so the
-  // result (?superlist=connected|error) is surfaced to the user.
+  // After a Superlist OAuth login redirect, re-open the settings modal
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -57,7 +60,7 @@ export default function HomePage() {
   }, []);
 
   const handleCaptured = () => {
-    setRefreshKey((k) => k + 1);
+    syncNow();
   };
 
   return (
@@ -76,22 +79,24 @@ export default function HomePage() {
       </aside>
 
       {/* Main View Area */}
-      <main className="flex-1 overflow-y-auto lg:pb-0 pb-28">
-        {currentView === 'today' && (
-          <TodayDashboard
-            key={refreshKey}
-            onNavigate={(v) => setCurrentView(v)}
-            onOpenCapture={() => setIsCaptureOpen(true)}
-          />
-        )}
-        {currentView === 'tasks' && <TasksView key={refreshKey} />}
-        {currentView === 'routines' && <RoutinesView key={refreshKey} />}
-        {currentView === 'projects' && <ProjectsView key={refreshKey} />}
-        {currentView === 'people' && <PeopleView key={refreshKey} />}
-        {currentView === 'library' && <LibraryView key={refreshKey} />}
-        {currentView === 'domains' && <DomainsView key={refreshKey} />}
-        {currentView === 'weekly-review' && <WeeklyReviewView key={refreshKey} />}
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto lg:pb-0 pb-28">
+          {currentView === 'today' && (
+            <TodayDashboard
+              onNavigate={(v) => setCurrentView(v)}
+              onOpenCapture={() => setIsCaptureOpen(true)}
+            />
+          )}
+          {currentView === 'tasks' && <TasksView />}
+          {currentView === 'routines' && <RoutinesView />}
+          {currentView === 'projects' && <ProjectsView />}
+          {currentView === 'people' && <PeopleView />}
+          {currentView === 'library' && <LibraryView />}
+          {currentView === 'domains' && <DomainsView />}
+          {currentView === 'weekly-review' && <WeeklyReviewView />}
+        </main>
+      </div>
 
       {/* Mobile Bottom Navigation */}
       <BottomNav

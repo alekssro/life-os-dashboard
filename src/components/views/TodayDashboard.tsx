@@ -45,6 +45,10 @@ function getGoogleCalendarUrl(date: Date | string, title?: string): string {
 import { EditTaskPanel } from '@/components/EditTaskPanel';
 import { EditRoutinePanel } from '@/components/EditRoutinePanel';
 import { resolveSuperlistTaskUrl } from '@/lib/superlist';
+import { SuperlistTaskHub } from '@/components/SuperlistTaskHub';
+import { CalendarView } from '@/components/CalendarView';
+import { HabitTracker } from '@/components/HabitTracker';
+import { ObsidianCapture } from '@/components/ObsidianCapture';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
@@ -358,8 +362,20 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
       {/* Main 2-Column Grid (Center Tasks/Events + Right Rail) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT / CENTER COLUMN (7 cols) */}
-        <div className="lg:col-span-7 space-y-9">
-          {/* 1. TOP 3 FOR TODAY */}
+        <div className="lg:col-span-7 space-y-8">
+          {/* Modular Superlist Task Hub with Focus Mode filtering & optimistic updates */}
+          <SuperlistTaskHub
+            onOpenCapture={onOpenCapture}
+            onEditTask={(id) => setEditingTaskId(id)}
+          />
+
+          {/* Habit & Routine Matrix Tracker with Github heatmap */}
+          <HabitTracker />
+
+          {/* Obsidian Markdown Quick Capture */}
+          <ObsidianCapture />
+
+          {/* 1. TOP 3 FOR TODAY (Legacy view retained for direct fallback) */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-mono font-semibold tracking-wider uppercase text-[var(--paper-muted)]">
@@ -693,6 +709,9 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
         {/* RIGHT RAIL COLUMN (5 cols) */}
         <div className="lg:col-span-5 space-y-8">
+          {/* Modular Google Calendar View filtered by Focus Mode */}
+          <CalendarView />
+
           {/* 1. ATTENTION ENGINE - Project Health */}
           <section>
             <div className="flex items-center justify-between mb-2">
