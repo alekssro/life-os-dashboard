@@ -48,7 +48,7 @@ export function Sidebar({
   const navItems = [
     { id: 'today' as NavItem, label: 'Today', icon: Flame, badge: slippingCount > 0 ? slippingCount : undefined },
     { id: 'tasks' as NavItem, label: 'Tasks', icon: CheckSquare },
-    { id: 'routines' as NavItem, label: 'Routines', icon: Repeat },
+    { id: 'routines' as NavItem, label: 'Habits', icon: Repeat },
     { id: 'projects' as NavItem, label: 'Projects', icon: FolderKanban },
     { id: 'people' as NavItem, label: 'People', icon: Users },
     { id: 'library' as NavItem, label: 'Library', icon: BookOpen },
