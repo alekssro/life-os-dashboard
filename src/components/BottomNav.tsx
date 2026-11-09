@@ -37,7 +37,7 @@ interface BottomNavProps {
 const mainNavItems: { id: NavItem; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
   { id: 'today', label: 'Today', icon: Flame },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { id: 'routines', label: 'Routines', icon: Repeat },
+  { id: 'routines', label: 'Habits', icon: Repeat },
 ];
 
 const moreNavItems: { id: NavItem; label: string; icon: React.ComponentType<{ className?: string }> }[] = [

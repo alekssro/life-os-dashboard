@@ -29,7 +29,7 @@ export function CalendarView() {
       <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4 text-[var(--paper-accent)]" />
-          <h2 className="font-bold text-sm text-[var(--paper-text)]">Schedule & Calendar</h2>
+          <h2 className="font-bold text-sm text-[var(--paper-text)]">Calendar</h2>
         </div>
         <a
           href="https://calendar.google.com"

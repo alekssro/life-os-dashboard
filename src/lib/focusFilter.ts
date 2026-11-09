@@ -48,6 +48,8 @@ export function matchesFocusMode(
       return (
         text.includes('personal') ||
         text.includes('family') ||
+        text.includes('r&a') ||
+        text.includes('r & a') ||
         text.includes('health') ||
         text.includes('routine') ||
         text.includes('home') ||
