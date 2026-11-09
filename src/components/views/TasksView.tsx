@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { TaskHub } from '@/components/TaskHub';
-import { EditTaskPanel } from '@/components/EditTaskPanel';
+import { EditTaskModal } from '@/components/EditTaskModal';
 import { CaptureModal } from '@/components/CaptureModal';
 
 export function TasksView() {
@@ -58,18 +58,14 @@ export function TasksView() {
         onEditTask={(id) => setEditingId(id)}
       />
 
-      {/* Inline edit drawer/modal if task selected */}
-      {taskToEdit && (
-        <div className="p-4 rounded-xl border border-[var(--paper-border-strong)] bg-[var(--paper-card)] shadow-lg space-y-3">
-          <h3 className="font-bold text-sm text-[var(--paper-text)]">Edit Task</h3>
-          <EditTaskPanel
-            task={taskToEdit}
-            domains={domains}
-            onSave={(updates) => handleSaveEdit(taskToEdit.id, updates)}
-            onCancel={() => setEditingId(null)}
-          />
-        </div>
-      )}
+      {/* Pop-up Edit Task Modal */}
+      <EditTaskModal
+        task={taskToEdit || null}
+        domains={domains}
+        isOpen={Boolean(editingId)}
+        onClose={() => setEditingId(null)}
+        onSave={(id, updates) => handleSaveEdit(id, updates)}
+      />
 
       <CaptureModal
         isOpen={isCaptureOpen}

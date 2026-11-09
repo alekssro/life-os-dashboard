@@ -25,7 +25,7 @@ import { TaskHub } from '@/components/TaskHub';
 import { CalendarView } from '@/components/CalendarView';
 import { HabitTracker } from '@/components/HabitTracker';
 import { ObsidianCapture } from '@/components/ObsidianCapture';
-import { EditTaskPanel } from '@/components/EditTaskPanel';
+import { EditTaskModal } from '@/components/EditTaskModal';
 import { useDashboardStore } from '@/store/useDashboardStore';
 
 interface TodayDashboardProps {
@@ -160,18 +160,14 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
           {/* 3. Obsidian Markdown Quick Capture */}
           <ObsidianCapture />
 
-          {/* Inline Edit Task Drawer */}
-          {taskBeingEdited && (
-            <div className="p-4 rounded-xl border border-[var(--paper-border-strong)] bg-[var(--paper-card)] shadow-md space-y-3">
-              <h3 className="font-bold text-sm text-[var(--paper-text)]">Edit Task</h3>
-              <EditTaskPanel
-                task={taskBeingEdited}
-                domains={domains}
-                onSave={(updates) => saveTask(taskBeingEdited.id, updates)}
-                onCancel={() => setEditingTaskId(null)}
-              />
-            </div>
-          )}
+          {/* Edit Task Pop-up Modal */}
+          <EditTaskModal
+            task={taskBeingEdited || null}
+            domains={domains}
+            isOpen={Boolean(editingTaskId)}
+            onClose={() => setEditingTaskId(null)}
+            onSave={(id, updates) => saveTask(id, updates)}
+          />
         </div>
 
         {/* RIGHT RAIL COLUMN (5 cols) */}

@@ -7,12 +7,7 @@ import {
 } from 'lucide-react';
 import { HabitTracker } from '@/components/HabitTracker';
 import { useDashboardStore } from '@/store/useDashboardStore';
-import {
-  EditRoutinePanel,
-  FrequencyBadge,
-  FREQUENCY_OPTIONS,
-  DAYS_OF_WEEK,
-} from '@/components/EditRoutinePanel';
+import { EditRoutineModal } from '@/components/EditRoutineModal';
 
 export function RoutinesView() {
   const routines = useDashboardStore((s) => s.routines);
@@ -86,6 +81,7 @@ export function RoutinesView() {
         isTodayOnly={false}
         allowYearlyView={true}
         showControls={true}
+        onEditHabit={(id) => setEditingId(id)}
       />
 
       {/* Quick Add Habit Form */}
@@ -133,17 +129,13 @@ export function RoutinesView() {
         </form>
       </div>
 
-      {/* Routine Edit Drawer */}
-      {routineToEdit && (
-        <div className="p-4 rounded-xl border border-[var(--paper-border-strong)] bg-[var(--paper-card)] shadow-lg space-y-3">
-          <h3 className="font-bold text-sm text-[var(--paper-text)]">Edit Habit Details</h3>
-          <EditRoutinePanel
-            routine={routineToEdit}
-            onSave={(updates) => handleSaveEdit(routineToEdit.id, updates)}
-            onCancel={() => setEditingId(null)}
-          />
-        </div>
-      )}
+      {/* Pop-up Routine Edit Modal */}
+      <EditRoutineModal
+        routine={routineToEdit || null}
+        isOpen={Boolean(editingId)}
+        onClose={() => setEditingId(null)}
+        onSave={(id, updates) => handleSaveEdit(id, updates)}
+      />
     </div>
   );
 }

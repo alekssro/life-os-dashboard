@@ -15,7 +15,7 @@ import {
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { toISODate, formatDateYYYYMMDD, appDayStart } from '@/lib/date';
 import { Routine } from '@/types';
-import { EditRoutinePanel } from '@/components/EditRoutinePanel';
+import { EditRoutineModal } from '@/components/EditRoutineModal';
 
 interface HabitTrackerProps {
   title?: string;
@@ -42,7 +42,7 @@ export function HabitTracker({
   const loadHabitHistory = useDashboardStore((s) => s.loadHabitHistory);
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
 
-  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [modalEditingId, setModalEditingId] = useState<string | null>(null);
 
   const todayStr = useMemo(() => toISODate(appDayStart()), []);
 
@@ -103,13 +103,13 @@ export function HabitTracker({
     setSelectedDate(formatDateYYYYMMDD(curr));
   };
 
-  const handleSaveInlineEdit = async (id: string, updates: any) => {
+  const handleSaveModalEdit = async (id: string, updates: any) => {
     await fetch('/api/routines', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
     });
-    setInlineEditingId(null);
+    setModalEditingId(null);
     fetchDashboardData();
   };
 
@@ -129,8 +129,6 @@ export function HabitTracker({
       selectedDate === todayStr
         ? !!routine.isCompletedToday
         : !!habitHistory[routine.id]?.[selectedDate];
-
-    const isEditingThis = inlineEditingId === routine.id;
 
     return (
       <div
@@ -154,7 +152,7 @@ export function HabitTracker({
             <span
               onClick={() => {
                 if (onEditHabit) onEditHabit(routine.id);
-                else setInlineEditingId(isEditingThis ? null : routine.id);
+                else setModalEditingId(routine.id);
               }}
               className="text-xs sm:text-sm font-medium text-[var(--paper-text)] truncate cursor-pointer hover:text-[var(--paper-accent)] transition"
               title="Click to edit habit"
@@ -165,7 +163,7 @@ export function HabitTracker({
               type="button"
               onClick={() => {
                 if (onEditHabit) onEditHabit(routine.id);
-                else setInlineEditingId(isEditingThis ? null : routine.id);
+                else setModalEditingId(routine.id);
               }}
               className="text-[var(--paper-muted)] hover:text-[var(--paper-text)] p-0.5 opacity-60 hover:opacity-100 transition"
               title="Edit habit"
@@ -265,17 +263,6 @@ export function HabitTracker({
                 ))}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Inline Edit Panel when expanded */}
-        {isEditingThis && (
-          <div className="mt-2 pt-2 border-t border-[var(--paper-border)]">
-            <EditRoutinePanel
-              routine={routine}
-              onSave={(updates) => handleSaveInlineEdit(routine.id, updates)}
-              onCancel={() => setInlineEditingId(null)}
-            />
           </div>
         )}
       </div>
@@ -386,6 +373,14 @@ export function HabitTracker({
           )}
         </div>
       )}
+
+      {/* Pop-up Edit Modal */}
+      <EditRoutineModal
+        routine={routines.find((r) => r.id === modalEditingId) || null}
+        isOpen={Boolean(modalEditingId)}
+        onClose={() => setModalEditingId(null)}
+        onSave={handleSaveModalEdit}
+      />
     </div>
   );
 }
