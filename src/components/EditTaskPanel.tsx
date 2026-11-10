@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Star, X } from 'lucide-react';
 import { CalendarDateInput } from '@/components/CalendarDateInput';
 import { toISODate } from '@/lib/date';
 import { SLOT_LABELS } from '@/lib/pushClient';
@@ -32,6 +32,7 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
   const [superlistUrl, setSuperlistUrl] = useState(task.superlistUrl || '');
   // null → Morning digest; 'SLOT' | 'HH:MM' | 'NONE' otherwise.
   const [reminderAt, setReminderAt] = useState(task.reminderAt || 'MORNING');
+  const [isTop3, setIsTop3] = useState(Boolean(task.isTop3));
   const isCustomTime = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(reminderAt);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,6 +52,7 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
       title: title.trim(),
       domainId: domainId || null,
       dueDate: dueDate || null,
+      isTop3,
       isRecurring: Boolean(recurrenceRule),
       recurrenceRule: recurrenceRule || null,
       notes: notes.trim() || null,
@@ -113,6 +115,21 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
             </option>
           ))}
         </select>
+
+        {/* Star / Top 3 Focus */}
+        <button
+          type="button"
+          onClick={() => setIsTop3(!isTop3)}
+          className={`flex items-center justify-center gap-1.5 px-2.5 py-1 rounded border text-xs font-mono transition-colors ${
+            isTop3
+              ? 'border-[var(--paper-star)] bg-[var(--paper-card-subtle)] text-[var(--paper-star)] font-bold'
+              : 'border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)]'
+          }`}
+          title="Starred tasks appear under Top Priorities"
+        >
+          <Star className={`w-3.5 h-3.5 ${isTop3 ? 'fill-current' : ''}`} />
+          <span>Top 3 Focus</span>
+        </button>
       </div>
 
       {/* Reminder (daily notification) */}

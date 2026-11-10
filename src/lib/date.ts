@@ -140,6 +140,18 @@ export function parseInputToISO(value: string): string {
 /** Weekday name (e.g. "Friday") so the heading never depends on number formatting. */
 export function formatWeekday(date: Date | string | null | undefined): string {
   if (!date) return '';
+
+  // Date-only strings carry no timezone — build a local Date so the weekday
+  // never shifts a day in western timezones.
+  if (typeof date === 'string') {
+    const iso = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      return new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(
+        new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+      );
+    }
+  }
+
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(d);

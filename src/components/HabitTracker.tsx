@@ -12,9 +12,10 @@ import {
   Moon,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
-import { toISODate, formatDateYYYYMMDD, appDayStart } from '@/lib/date';
+import { toISODate, formatDateYYYYMMDD, formatDateDDMMYYYY, appDayStart } from '@/lib/date';
 import { Routine } from '@/types';
 import { EditRoutineModal } from '@/components/EditRoutineModal';
+import { CalendarDateInput } from '@/components/CalendarDateInput';
 
 interface HabitTrackerProps {
   title?: string;
@@ -140,7 +141,7 @@ export function HabitTracker({
               type="button"
               onClick={() => toggleHabitOptimistic(routine.id, selectedDate)}
               className="text-[var(--paper-muted)] hover:text-[var(--paper-accent)] transition active:scale-90 shrink-0"
-              title={`Toggle completion for ${selectedDate}`}
+              title={`Toggle completion for ${formatDateDDMMYYYY(selectedDate)}`}
             >
               {isCompletedSelectedDay ? (
                 <CheckSquare className="w-4 h-4 text-[var(--paper-accent)]" />
@@ -186,10 +187,11 @@ export function HabitTracker({
                   key={dStr}
                   type="button"
                   onClick={() => {
-                    setSelectedDate(dStr);
+                    // Toggle the clicked day only — the strip stays anchored to the
+                    // selected week/month so the view never shifts on interaction.
                     toggleHabitOptimistic(routine.id, dStr);
                   }}
-                  title={`${dStr}: ${isDone ? 'Completed' : 'Missed'} (Click to toggle)`}
+                  title={`${formatDateDDMMYYYY(dStr)}: ${isDone ? 'Completed' : 'Missed'} (Click to toggle)`}
                   className={`w-3.5 h-3.5 rounded-xs transition-all border ${
                     isSelected ? 'ring-2 ring-[var(--paper-accent)] ring-offset-1' : ''
                   } ${
@@ -233,10 +235,11 @@ export function HabitTracker({
                           key={dStr}
                           type="button"
                           onClick={() => {
-                            setSelectedDate(dStr);
+                            // Toggle the clicked day only — the yearly grid stays
+                            // fixed to the selected year window.
                             toggleHabitOptimistic(routine.id, dStr);
                           }}
-                          title={`${dStr}: ${isDone ? 'Completed' : 'Missed'} (Click to toggle)`}
+                          title={`${formatDateDDMMYYYY(dStr)}: ${isDone ? 'Completed' : 'Missed'} (Click to toggle)`}
                           className={`w-2.5 h-2.5 rounded-xs transition-all border block ${
                             isSelected ? 'ring-1 ring-[var(--paper-accent)]' : ''
                           } ${
@@ -303,11 +306,11 @@ export function HabitTracker({
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <input
-                type="date"
+              <CalendarDateInput
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent text-[11px] font-mono text-[var(--paper-text)] outline-none cursor-pointer"
+                onChange={(iso) => setSelectedDate(iso)}
+                popupAlign="right"
+                className="bg-transparent text-[11px] font-mono text-[var(--paper-text)] outline-none cursor-pointer w-[78px]"
               />
               <button
                 onClick={() => handleStepDate('next')}

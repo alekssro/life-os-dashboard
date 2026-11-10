@@ -18,7 +18,7 @@ interface DashboardState {
   routines: Routine[];
   domains: Domain[];
   habitHistory: HabitHistoryMap;
-  selectedHabitDate: string; // YYYY-MM-DD
+  selectedHabitDate: string; // YYYY-MM-DD anchoring the matrix window & row checkbox
   habitViewMode: 'WEEK' | 'MONTH' | 'YEAR';
 
   // State Setters
@@ -33,6 +33,7 @@ interface DashboardState {
   fetchDashboardData: () => Promise<void>;
   syncNow: () => Promise<void>;
   toggleTaskOptimistic: (taskId: string) => Promise<boolean>;
+  toggleTaskStarOptimistic: (taskId: string) => Promise<boolean>;
   toggleHabitOptimistic: (routineId: string, dateStr?: string) => Promise<boolean>;
   loadHabitHistory: (startDate?: string, endDate?: string) => Promise<void>;
 }
@@ -159,6 +160,43 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       return true;
     } catch (err) {
       console.error('Task update failed, rolling back:', err);
+      // Fast rollback
+      set({ tasks: prevTasks });
+      return false;
+    }
+  },
+
+  toggleTaskStarOptimistic: async (taskId: string) => {
+    const prevTasks = get().tasks;
+    const task = prevTasks.find((t) => t.id === taskId);
+    if (!task) return false;
+
+    const nextStarred = !task.isTop3;
+
+    // 1. Apply Optimistic Update
+    set({
+      tasks: prevTasks.map((t) => (t.id === taskId ? { ...t, isTop3: nextStarred } : t)),
+    });
+
+    // 2. Network Dispatch With Fast Rollback on failure
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, isTop3: nextStarred }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to star task: ${res.statusText}`);
+      }
+
+      const updatedTask = await res.json();
+      set({
+        tasks: get().tasks.map((t) => (t.id === taskId ? { ...t, ...updatedTask } : t)),
+      });
+      return true;
+    } catch (err) {
+      console.error('Task star update failed, rolling back:', err);
       // Fast rollback
       set({ tasks: prevTasks });
       return false;

@@ -32,6 +32,7 @@ export function TaskHub({
   const tasks = useDashboardStore((s) => s.tasks);
   const focusMode = useDashboardStore((s) => s.focusMode);
   const toggleTaskOptimistic = useDashboardStore((s) => s.toggleTaskOptimistic);
+  const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
 
   const [isOtherCollapsed, setIsOtherCollapsed] = useState(false);
 
@@ -81,6 +82,7 @@ export function TaskHub({
                 key={task.id}
                 task={task}
                 onToggle={() => toggleTaskOptimistic(task.id)}
+                onStar={() => toggleTaskStarOptimistic(task.id)}
                 onEdit={() => onEditTask && onEditTask(task.id)}
               />
             ))}
@@ -121,6 +123,7 @@ export function TaskHub({
                     key={task.id}
                     task={task}
                     onToggle={() => toggleTaskOptimistic(task.id)}
+                    onStar={() => toggleTaskStarOptimistic(task.id)}
                     onEdit={() => onEditTask && onEditTask(task.id)}
                   />
                 ))}
@@ -142,6 +145,7 @@ export function TaskHub({
                 key={task.id}
                 task={task}
                 onToggle={() => toggleTaskOptimistic(task.id)}
+                onStar={() => toggleTaskStarOptimistic(task.id)}
                 onEdit={() => onEditTask && onEditTask(task.id)}
               />
             ))}
@@ -155,10 +159,12 @@ export function TaskHub({
 function TaskItem({
   task,
   onToggle,
+  onStar,
   onEdit,
 }: {
   task: Task;
   onToggle: () => void;
+  onStar: () => void;
   onEdit: () => void;
 }) {
   const isDone = task.status === 'DONE';
@@ -209,6 +215,22 @@ function TaskItem({
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStar();
+          }}
+          className={`shrink-0 transition active:scale-90 ${
+            task.isTop3
+              ? 'text-[var(--paper-star)]'
+              : 'text-[var(--paper-muted)] hover:text-[var(--paper-star)]'
+          }`}
+          title={task.isTop3 ? 'Remove star (Top 3 Focus)' : 'Star as Top 3 Focus'}
+        >
+          <Star className={`w-3.5 h-3.5 ${task.isTop3 ? 'fill-current' : ''}`} />
+        </button>
+
         {task.dueDate && (
           <span className="text-[10px] text-[var(--paper-muted)] font-mono">
             {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}

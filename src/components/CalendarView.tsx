@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
-import { Calendar as CalendarIcon, Clock, MapPin, ExternalLink } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Calendar as CalendarIcon, MapPin, ExternalLink } from 'lucide-react';
 import { Event } from '@/types';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { filterEventsByFocus } from '@/lib/focusFilter';
+import { formatDateDDMMYYYY, formatWeekday, toISODate, todayISO } from '@/lib/date';
 
 function getGoogleCalendarUrl(date: Date | string, title?: string): string {
   const d = new Date(date);
@@ -17,12 +18,72 @@ function getGoogleCalendarUrl(date: Date | string, title?: string): string {
   return `https://calendar.google.com/calendar/u/0/r/day/${yyyy}/${mm}/${dd}`;
 }
 
+/**
+ * Minutes since midnight for schedule sorting. Accepts "HH:MM" (24h) and
+ * "H:MM AM/PM" strings; untimed events sort last within their day.
+ */
+function timeToMinutes(t?: string | null): number {
+  if (!t) return Number.POSITIVE_INFINITY;
+  const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (!m) return Number.POSITIVE_INFINITY;
+
+  let hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  const meridiem = m[3]?.toLowerCase();
+  if (meridiem === 'pm' && hours < 12) hours += 12;
+  if (meridiem === 'am' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+}
+
+interface DayGroup {
+  date: string; // YYYY-MM-DD
+  events: Event[];
+}
+
 export function CalendarView() {
   const events = useDashboardStore((s) => s.events);
   const focusMode = useDashboardStore((s) => s.focusMode);
 
   // Filter events based on active Focus context (Deep Work, Homelab, Personal)
   const filteredEvents = filterEventsByFocus(events, focusMode);
+
+  // Divide the upcoming events by day, schedule-style
+  const dayGroups = useMemo<DayGroup[]>(() => {
+    const groups = new Map<string, Event[]>();
+    for (const event of filteredEvents) {
+      const key = toISODate(event.date);
+      const bucket = groups.get(key);
+      if (bucket) {
+        bucket.push(event);
+      } else {
+        groups.set(key, [event]);
+      }
+    }
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, dayEvents]) => ({
+        date,
+        events: [...dayEvents].sort(
+          (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+        ),
+      }));
+  }, [filteredEvents]);
+
+  const todayStr = todayISO();
+  const tomorrowStr = addDaysISO(todayStr, 1);
+
+  const relativeLabel = (dateStr: string): string | null => {
+    if (dateStr === todayStr) return 'Today';
+    if (dateStr === tomorrowStr) return 'Tomorrow';
+    return null;
+  };
 
   return (
     <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
@@ -42,54 +103,90 @@ export function CalendarView() {
         </a>
       </div>
 
-      {filteredEvents.length === 0 ? (
+      {dayGroups.length === 0 ? (
         <div className="text-xs text-[var(--paper-muted)] italic py-3 text-center">
           No upcoming events scheduled for this focus mode.
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredEvents.slice(0, 6).map((event) => {
-            const calUrl = getGoogleCalendarUrl(event.date, event.title);
+        <div className="space-y-3">
+          {dayGroups.map((group) => {
+            const label = relativeLabel(group.date);
             return (
-              <a
-                key={event.id}
-                href={calUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group block p-2 rounded-lg border border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] bg-[var(--paper-card-subtle)] transition"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-[var(--paper-text)] group-hover:text-[var(--paper-accent)] transition truncate">
-                    {event.title}
+              <div key={group.date} className="space-y-1.5">
+                {/* Day header — divides the schedule by date */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--paper-text)]">
+                    {label || formatWeekday(group.date)}
                   </span>
-                  {event.calendar && (
-                    <span
-                      className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase"
-                      style={{
-                        backgroundColor: `${event.calendar.color || '#4285F4'}15`,
-                        color: event.calendar.color || '#4285F4',
-                      }}
-                    >
-                      {event.calendar.name}
-                    </span>
-                  )}
+                  <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                    {formatDateDDMMYYYY(group.date)}
+                  </span>
+                  <span className="flex-1 border-t border-[var(--paper-border)]" />
+                  <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                    {group.events.length}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--paper-muted)]">
-                  {(event.startTime || event.endTime) && (
-                    <span className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3" />
-                      {event.startTime || ''} {event.endTime ? `- ${event.endTime}` : ''}
-                    </span>
-                  )}
-                  {event.location && (
-                    <span className="flex items-center gap-1 truncate max-w-[150px]">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      {event.location}
-                    </span>
-                  )}
-                </div>
-              </a>
+                {group.events.map((event) => {
+                  const calUrl = getGoogleCalendarUrl(event.date, event.title);
+                  return (
+                    <a
+                      key={event.id}
+                      href={calUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex gap-2 p-2 rounded-lg border border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] bg-[var(--paper-card-subtle)] transition"
+                    >
+                      {/* Time column */}
+                      <div className="w-[52px] shrink-0 flex flex-col items-end justify-center text-right border-r border-[var(--paper-border)] pr-2">
+                        {event.startTime ? (
+                          <>
+                            <span className="text-[11px] font-mono font-semibold text-[var(--paper-text)]">
+                              {event.startTime}
+                            </span>
+                            {event.endTime && (
+                              <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                                - {event.endTime}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-[9px] font-mono uppercase text-[var(--paper-muted)]">
+                            All day
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Event body */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-[var(--paper-text)] group-hover:text-[var(--paper-accent)] transition truncate">
+                            {event.title}
+                          </span>
+                          {event.calendar && (
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase shrink-0"
+                              style={{
+                                backgroundColor: `${event.calendar.color || '#4285F4'}15`,
+                                color: event.calendar.color || '#4285F4',
+                              }}
+                            >
+                              {event.calendar.name}
+                            </span>
+                          )}
+                        </div>
+
+                        {event.location && (
+                          <div className="flex items-center gap-1 mt-0.5 text-[11px] text-[var(--paper-muted)]">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
             );
           })}
         </div>

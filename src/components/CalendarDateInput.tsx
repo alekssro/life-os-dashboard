@@ -12,6 +12,8 @@ interface CalendarDateInputProps {
   id?: string;
   autoFocus?: boolean;
   disabled?: boolean;
+  /** Where the popup calendar anchors when the input sits near the right edge of the screen. */
+  popupAlign?: 'left' | 'right';
 }
 
 const MONTHS = [
@@ -54,6 +56,7 @@ export function CalendarDateInput({
   id,
   autoFocus,
   disabled,
+  popupAlign = 'left',
 }: CalendarDateInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -196,7 +199,7 @@ export function CalendarDateInput({
       {showCalendar && !disabled && (
         <div
           className="absolute z-50 mt-1 w-64 bg-[var(--paper-card)] border border-[var(--paper-border)] rounded-lg shadow-lg p-3 animate-in fade-in-0 zoom-in-95 duration-150"
-          style={{ left: 0 }}
+          style={popupAlign === 'right' ? { right: 0 } : { left: 0 }}
         >
           <div className="flex items-center justify-between mb-2">
             <button
