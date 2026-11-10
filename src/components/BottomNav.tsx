@@ -2,18 +2,24 @@
 
 import {
   BookOpen,
+  Check,
   CheckSquare,
   ClipboardList,
+  Coffee,
   Flame,
   Globe,
   Home,
   Layers,
   Menu,
+  Monitor,
+  Moon,
   Plus,
   RefreshCw,
   Repeat,
   Server,
   Settings,
+  Sun,
+  Tablet,
   X,
   Zap,
 } from 'lucide-react';
@@ -21,6 +27,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { FocusMode } from '@/types';
 import { formatDateDDMMYYYY, formatTimeHHMM } from '@/lib/date';
+import { useTheme, ThemeType } from '@/lib/theme';
+
+/** Icon per display theme (matches the settings picker). */
+const THEME_ICONS: Record<ThemeType, React.ElementType> = {
+  system: Monitor,
+  warm: Coffee,
+  eink: Tablet,
+  light: Sun,
+  dark: Moon,
+};
 
 export type NavItem =
   | 'today'
@@ -66,6 +82,9 @@ export function BottomNav({
   const syncNow = useDashboardStore((s) => s.syncNow);
   const isSyncing = useDashboardStore((s) => s.isSyncing);
   const lastSyncedAt = useDashboardStore((s) => s.lastSyncedAt);
+
+  // Display theme (the mobile equivalent of the settings picker).
+  const { theme, setTheme, availableThemes } = useTheme();
 
   const focusOptions: { mode: FocusMode; label: string; icon: React.ElementType }[] = [
     { mode: 'ALL', label: 'All focus', icon: Globe },
@@ -147,7 +166,7 @@ export function BottomNav({
 
             {/* More Dropdown */}
             {isMoreOpen && (
-              <div className="absolute bottom-full right-0 mb-2 w-56 origin-bottom-right rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card)] shadow-xl ring-1 ring-[var(--paper-border)] animate-in fade-in-0 zoom-in-95 duration-150">
+              <div className="absolute bottom-full right-0 mb-2 w-56 max-h-[75vh] overflow-y-auto origin-bottom-right rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card)] shadow-xl ring-1 ring-[var(--paper-border)] animate-in fade-in-0 zoom-in-95 duration-150">
                 {/* Views Section */}
                 <div className="p-2">
                   <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)] px-2 py-1">Views</p>
@@ -197,6 +216,40 @@ export function BottomNav({
                           }`}
                         >
                           <Icon className="w-4 h-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-[var(--paper-border)] mx-2" />
+
+                {/* Display theme */}
+                <div className="p-2">
+                  <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)] px-2 py-1">
+                    Theme
+                  </p>
+                  <div className="space-y-0.5">
+                    {availableThemes.map((t) => {
+                      const Icon = THEME_ICONS[t.id] ?? Globe;
+                      const isActive = theme === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => setTheme(t.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-[var(--paper-card-subtle)] text-[var(--paper-text)] font-semibold'
+                              : 'text-[var(--paper-muted)] hover:bg-[var(--paper-card-subtle)] hover:text-[var(--paper-text)]'
+                          }`}
+                        >
+                          <Icon
+                            className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--paper-accent)]' : ''}`}
+                          />
+                          <span className="flex-1 text-left">{t.label}</span>
+                          {isActive && (
+                            <Check className="w-3.5 h-3.5 shrink-0 text-[var(--paper-accent)]" />
+                          )}
                         </button>
                       );
                     })}
