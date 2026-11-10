@@ -34,6 +34,7 @@ interface DashboardState {
   syncNow: () => Promise<void>;
   toggleTaskOptimistic: (taskId: string) => Promise<boolean>;
   toggleTaskStarOptimistic: (taskId: string) => Promise<boolean>;
+  clearCompletedTasks: () => Promise<number>;
   toggleHabitOptimistic: (routineId: string, dateStr?: string) => Promise<boolean>;
   loadHabitHistory: (startDate?: string, endDate?: string) => Promise<void>;
 }
@@ -65,7 +66,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     try {
       const [tasksRes, eventsRes, routinesRes, domainsRes] = await Promise.all([
         fetch('/api/tasks'),
-        fetch('/api/events'),
+        // Today briefing horizon: current day + next 14 days.
+        fetch('/api/events?days=14&limit=200'),
         fetch('/api/routines'),
         fetch('/api/domains'),
       ]);
@@ -200,6 +202,33 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Fast rollback
       set({ tasks: prevTasks });
       return false;
+    }
+  },
+
+  clearCompletedTasks: async () => {
+    const prevTasks = get().tasks;
+    const isClosed = (t: Task) => t.status === 'DONE' || t.status === 'CANCELLED';
+    const closedCount = prevTasks.filter(isClosed).length;
+    if (closedCount === 0) return 0;
+
+    // Optimistic: drop every closed task from the local list.
+    set({ tasks: prevTasks.filter((t) => !isClosed(t)) });
+
+    try {
+      // Bulk delete — Superlist has no delete API, so completed tasks stay
+      // completed there; only the local copies are removed.
+      const res = await fetch('/api/tasks?status=DONE,CANCELLED', { method: 'DELETE' });
+
+      if (!res.ok) {
+        throw new Error(`Failed to clear completed tasks: ${res.statusText}`);
+      }
+
+      return closedCount;
+    } catch (err) {
+      console.error('Failed to clear completed tasks, rolling back:', err);
+      // Fast rollback
+      set({ tasks: prevTasks });
+      return 0;
     }
   },
 

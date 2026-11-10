@@ -41,6 +41,24 @@ function addDaysISO(iso: string, days: number): string {
   return toISODate(d);
 }
 
+/**
+ * Compact 24h clock time for the schedule column. Accepts "11:00 AM",
+ * "7:30pm" and "19:00" → "11:00" / "19:30" / "19:00". "All Day" maps to null
+ * so all-day rows render as a label instead of a broken time range.
+ */
+function formatEventTime(t?: string | null): string | null {
+  if (!t) return null;
+  const trimmed = t.trim();
+  if (/^all[\s-]?day$/i.test(trimmed)) return null;
+  const m = trimmed.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (!m) return trimmed; // already 24h ("HH:MM") or another format
+  let hours = Number(m[1]);
+  const meridiem = m[3].toLowerCase();
+  if (meridiem === 'pm' && hours !== 12) hours += 12;
+  if (meridiem === 'am' && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, '0')}:${m[2]}`;
+}
+
 interface DayGroup {
   date: string; // YYYY-MM-DD
   events: Event[];
@@ -108,11 +126,11 @@ export function CalendarView() {
           No upcoming events scheduled for this focus mode.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {dayGroups.map((group) => {
             const label = relativeLabel(group.date);
             return (
-              <div key={group.date} className="space-y-1.5">
+              <div key={group.date} className="space-y-1">
                 {/* Day header — divides the schedule by date */}
                 <div className="flex items-center gap-2 pt-0.5">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--paper-text)]">
@@ -129,27 +147,27 @@ export function CalendarView() {
 
                 {group.events.map((event) => {
                   const calUrl = getGoogleCalendarUrl(event.date, event.title);
+                  const startFmt = formatEventTime(event.startTime);
+                  const endFmt = formatEventTime(event.endTime);
                   return (
                     <a
                       key={event.id}
                       href={calUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex gap-2 p-2 rounded-lg border border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] bg-[var(--paper-card-subtle)] transition"
+                      className="group flex gap-2 px-2 py-1.5 rounded-lg border border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] bg-[var(--paper-card-subtle)] transition"
                     >
                       {/* Time column */}
-                      <div className="w-[52px] shrink-0 flex flex-col items-end justify-center text-right border-r border-[var(--paper-border)] pr-2">
-                        {event.startTime ? (
-                          <>
-                            <span className="text-[11px] font-mono font-semibold text-[var(--paper-text)]">
-                              {event.startTime}
-                            </span>
-                            {event.endTime && (
-                              <span className="text-[10px] font-mono text-[var(--paper-muted)]">
-                                - {event.endTime}
+                      <div className="w-[84px] shrink-0 flex items-center justify-end text-right border-r border-[var(--paper-border)] pr-2">
+                        {startFmt ? (
+                          <span className="text-[11px] font-mono font-semibold text-[var(--paper-text)] whitespace-nowrap">
+                            {startFmt}
+                            {endFmt && (
+                              <span className="text-[var(--paper-muted)] font-normal">
+                                –{endFmt}
                               </span>
                             )}
-                          </>
+                          </span>
                         ) : (
                           <span className="text-[9px] font-mono uppercase text-[var(--paper-muted)]">
                             All day

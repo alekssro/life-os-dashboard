@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parseFlexibleDate } from '@/lib/date';
 import { validateApiKey } from '@/lib/auth';
 import { resolveSuperlistUrl } from '@/lib/superlist';
 import { pullSuperlistTasks } from '@/lib/superlistSync';
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
         const superlistId = t.id || t.uuid || t.superlistId;
         const taskListId = t.listId || t.superlistListId || listId || null;
         const taskUrl = resolveSuperlistUrl(t.url, taskListId, superlistId);
-        const dueDate = t.dueDate ? new Date(t.dueDate) : null;
+        const dueDate = t.dueDate ? parseFlexibleDate(t.dueDate) : null;
         const isDone = Boolean(t.isCompleted || t.completed || t.status === 'DONE');
         const taskDomainId = domainId || (await resolveDomainIdForList(taskListId));
 
@@ -179,7 +180,7 @@ export async function POST(req: NextRequest) {
       const superlistId = item.id || item.uuid || item.superlistId;
       const taskListId = item.listId || item.superlistListId || listId || null;
       const taskUrl = resolveSuperlistUrl(item.url, taskListId, superlistId);
-      const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+      const dueDate = item.dueDate ? parseFlexibleDate(item.dueDate) : null;
       const isDone = Boolean(item.isCompleted || item.completed || item.status === 'DONE');
       const taskDomainId = domainId || (await resolveDomainIdForList(taskListId));
 
@@ -351,7 +352,7 @@ export async function POST(req: NextRequest) {
                   ? new Date(item.completedAt)
                   : new Date()
                 : null,
-              dueDate: item.dueDate ? new Date(item.dueDate) : null,
+              dueDate: item.dueDate ? parseFlexibleDate(item.dueDate) : null,
               superlistListId: item.listId,
               superlistUrl: item.url,
               source: 'SUPERLIST',
@@ -373,7 +374,7 @@ export async function POST(req: NextRequest) {
               status: 'TODO',
               priority: item.priority as any,
               isTop3: Boolean(item.isTop3),
-              dueDate: item.dueDate ? new Date(item.dueDate) : null,
+              dueDate: item.dueDate ? parseFlexibleDate(item.dueDate) : null,
               source: 'SUPERLIST',
               superlistId: item.id,
               superlistListId: item.listId,

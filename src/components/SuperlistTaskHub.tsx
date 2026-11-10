@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CheckSquare,
   Square,
@@ -10,17 +10,53 @@ import {
   Filter,
   ChevronDown,
   ChevronRight,
+  Clock,
+  Trash2,
 } from 'lucide-react';
 import { Task } from '@/types';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { filterTasksByFocus } from '@/lib/focusFilter';
 import { resolveSuperlistUrl } from '@/lib/superlist';
+import { appDayEnd, appDayStart, formatDateDDMMShort } from '@/lib/date';
 
 interface TaskHubProps {
   onOpenCapture?: () => void;
   onEditTask?: (taskId: string) => void;
   title?: string;
   showFocusBadge?: boolean;
+}
+
+/** A task is actionable while it is neither done nor cancelled. */
+function isOpenTask(task: Task): boolean {
+  return task.status !== 'DONE' && task.status !== 'CANCELLED';
+}
+
+/** Overdue first, then due today — the ones that need attention now. */
+function sortByDueDate(a: Task, b: Task): number {
+  const av = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  const bv = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  if (av !== bv) return av - bv;
+  return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+}
+
+/** Most recently completed first. */
+function sortByCompletedAt(a: Task, b: Task): number {
+  const av = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+  const bv = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+  if (av !== bv) return bv - av;
+  return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+}
+
+/**
+ * True when the task is due before the end of the app's current day, i.e. it is
+ * either overdue (due date in the past) or due today. "Today" honours the
+ * 05:00 app-day boundary.
+ */
+function isDueTodayOrOverdue(task: Task, dayEnd: Date): boolean {
+  if (!task.dueDate) return false;
+  const due = new Date(task.dueDate);
+  if (isNaN(due.getTime())) return false;
+  return due.getTime() < dayEnd.getTime();
 }
 
 export function TaskHub({
@@ -33,15 +69,74 @@ export function TaskHub({
   const focusMode = useDashboardStore((s) => s.focusMode);
   const toggleTaskOptimistic = useDashboardStore((s) => s.toggleTaskOptimistic);
   const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
+  const clearCompletedTasks = useDashboardStore((s) => s.clearCompletedTasks);
 
+  const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
   const [isOtherCollapsed, setIsOtherCollapsed] = useState(false);
+  const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
 
-  // Filter tasks using active Focus Mode
-  const filteredTasks = filterTasksByFocus(tasks, focusMode);
+  // "Today" follows the app's 05:00 day boundary.
+  const dayEnd = useMemo(() => appDayEnd(), []);
 
-  const top3Tasks = filteredTasks.filter((t) => t.isTop3 && t.status !== 'DONE');
-  const otherOpenTasks = filteredTasks.filter((t) => !t.isTop3 && t.status !== 'DONE');
-  const completedTasks = filteredTasks.filter((t) => t.status === 'DONE');
+  const { topTasks, todayTasks, otherTasks, completedTasks } = useMemo(() => {
+    const openTasks = tasks.filter(isOpenTask);
+
+    // Focus mode narrows the actionable lists…
+    const focused = filterTasksByFocus(openTasks, focusMode);
+
+    const top = focused.filter((t) => t.isTop3).sort(sortByDueDate);
+    const today = focused
+      .filter((t) => !t.isTop3 && isDueTodayOrOverdue(t, dayEnd))
+      .sort(sortByDueDate);
+    const other = focused
+      .filter((t) => !t.isTop3 && !isDueTodayOrOverdue(t, dayEnd))
+      .sort(sortByDueDate);
+
+    // …but the completed list is a history log: it always shows every closed
+    // task, otherwise the focus filter silently hides finished work.
+    const completed = tasks.filter((t) => !isOpenTask(t)).sort(sortByCompletedAt);
+
+    return {
+      topTasks: top,
+      todayTasks: today,
+      otherTasks: other,
+      completedTasks: completed,
+    };
+  }, [tasks, focusMode, dayEnd]);
+
+  const renderTaskList = (list: Task[]) =>
+    list.map((task) => (
+      <TaskItem
+        key={task.id}
+        task={task}
+        onToggle={() => toggleTaskOptimistic(task.id)}
+        onStar={() => toggleTaskStarOptimistic(task.id)}
+        onEdit={() => onEditTask && onEditTask(task.id)}
+      />
+    ));
+
+  const handleClearCompleted = async () => {
+    const count = completedTasks.length;
+    if (count === 0 || isClearing) return;
+
+    const confirmed = confirm(
+      `Clear ${count} completed ${count === 1 ? 'task' : 'tasks'}?\n\n` +
+        'They stay completed in Superlist — only the local copies are removed.'
+    );
+    if (!confirmed) return;
+
+    setIsClearing(true);
+    setClearError(null);
+
+    const cleared = await clearCompletedTasks();
+
+    setIsClearing(false);
+    if (cleared === 0) {
+      setClearError('Could not clear completed tasks — please try again.');
+    }
+  };
 
   return (
     <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-4">
@@ -69,89 +164,141 @@ export function TaskHub({
         )}
       </div>
 
-      {/* Top Priorities Section (Never Collapsed) */}
-      {top3Tasks.length > 0 && (
+      {/* 1. Top Priorities (Never Collapsed) */}
+      {topTasks.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--paper-accent)]">
             <Star className="w-3.5 h-3.5 fill-current" />
-            Top Priorities ({top3Tasks.length})
+            Top Priorities ({topTasks.length})
           </div>
-          <div className="space-y-2">
-            {top3Tasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={() => toggleTaskOptimistic(task.id)}
-                onStar={() => toggleTaskStarOptimistic(task.id)}
-                onEdit={() => onEditTask && onEditTask(task.id)}
-              />
-            ))}
-          </div>
+          <div className="space-y-2">{renderTaskList(topTasks)}</div>
         </div>
       )}
 
-      {/* Other Open Tasks Section with Collapse Toggle */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setIsOtherCollapsed(!isOtherCollapsed)}
-            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[var(--paper-muted)] hover:text-[var(--paper-text)] transition select-none"
-          >
-            {isOtherCollapsed ? (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-            <span>Other Tasks ({otherOpenTasks.length})</span>
-          </button>
-          <span className="text-[10px] font-mono text-[var(--paper-muted)]">
-            {isOtherCollapsed ? 'Collapsed' : 'Expanded'}
-          </span>
+      {/* 2. Today / Overdue */}
+      {todayTasks.length > 0 && (
+        <div className="space-y-2">
+          <SectionHeader
+            icon={<Clock className="w-3.5 h-3.5" />}
+            label="Today / Overdue"
+            count={todayTasks.length}
+            isCollapsed={isTodayCollapsed}
+            onToggle={() => setIsTodayCollapsed(!isTodayCollapsed)}
+            tone="accent"
+          />
+          {!isTodayCollapsed && <div className="space-y-2">{renderTaskList(todayTasks)}</div>}
         </div>
+      )}
+
+      {/* 3. Other Open Tasks Section with Collapse Toggle */}
+      <div className="space-y-2">
+        <SectionHeader
+          icon={<Square className="w-3.5 h-3.5" />}
+          label="Other Tasks"
+          count={otherTasks.length}
+          isCollapsed={isOtherCollapsed}
+          onToggle={() => setIsOtherCollapsed(!isOtherCollapsed)}
+        />
 
         {!isOtherCollapsed && (
           <>
-            {otherOpenTasks.length === 0 ? (
+            {otherTasks.length === 0 ? (
               <div className="text-xs text-[var(--paper-muted)] italic py-2">
                 No active tasks for current focus context.
               </div>
             ) : (
-              <div className="space-y-2">
-                {otherOpenTasks.map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onToggle={() => toggleTaskOptimistic(task.id)}
-                    onStar={() => toggleTaskStarOptimistic(task.id)}
-                    onEdit={() => onEditTask && onEditTask(task.id)}
-                  />
-                ))}
-              </div>
+              <div className="space-y-2">{renderTaskList(otherTasks)}</div>
             )}
           </>
         )}
       </div>
 
-      {/* Recently Completed */}
+      {/* 4. Completed */}
       {completedTasks.length > 0 && (
-        <details className="pt-2 border-t border-[var(--paper-border)] text-xs text-[var(--paper-muted)]">
-          <summary className="cursor-pointer hover:text-[var(--paper-text)] font-medium">
-            Completed ({completedTasks.length})
-          </summary>
-          <div className="mt-2 space-y-2 opacity-70">
-            {completedTasks.slice(0, 5).map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={() => toggleTaskOptimistic(task.id)}
-                onStar={() => toggleTaskStarOptimistic(task.id)}
-                onEdit={() => onEditTask && onEditTask(task.id)}
-              />
-            ))}
-          </div>
-        </details>
+        <div className="space-y-2 pt-2 border-t border-[var(--paper-border)]">
+          <SectionHeader
+            icon={<CheckSquare className="w-3.5 h-3.5" />}
+            label="Completed"
+            count={completedTasks.length}
+            isCollapsed={isCompletedCollapsed}
+            onToggle={() => setIsCompletedCollapsed(!isCompletedCollapsed)}
+            tone="muted"
+          />
+
+          {!isCompletedCollapsed && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                  {completedTasks.length} closed {completedTasks.length === 1 ? 'task' : 'tasks'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearCompleted}
+                  disabled={isClearing}
+                  className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-red-500 hover:border-red-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Remove completed tasks from this dashboard"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {isClearing ? 'Clearing…' : 'Clear completed'}
+                </button>
+              </div>
+
+              {clearError && (
+                <div className="text-[10px] font-mono text-red-500">{clearError}</div>
+              )}
+
+              <div className="space-y-2 opacity-70">{renderTaskList(completedTasks)}</div>
+            </>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+/** Collapsible section header with a chevron and a Collapsed/Expanded hint. */
+function SectionHeader({
+  icon,
+  label,
+  count,
+  isCollapsed,
+  onToggle,
+  tone = 'default',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  tone?: 'default' | 'accent' | 'muted';
+}) {
+  const toneClass =
+    tone === 'accent'
+      ? 'text-[var(--paper-accent)]'
+      : tone === 'muted'
+        ? 'text-[var(--paper-muted)]'
+        : 'text-[var(--paper-text)]';
+
+  return (
+    <div className="flex items-center justify-between">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${toneClass} hover:text-[var(--paper-text)] transition select-none`}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5" />
+        )}
+        {icon}
+        <span>
+          {label} ({count})
+        </span>
+      </button>
+      <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+        {isCollapsed ? 'Collapsed' : 'Expanded'}
+      </span>
     </div>
   );
 }
@@ -173,6 +320,10 @@ function TaskItem({
     task.superlistListId || task.project?.superlistListId,
     task.superlistId
   );
+
+  const due = task.dueDate ? new Date(task.dueDate) : null;
+  const validDue = due && !isNaN(due.getTime()) ? due : null;
+  const isOverdue = !!validDue && !isDone && validDue.getTime() < appDayStart().getTime();
 
   return (
     <div
@@ -231,9 +382,21 @@ function TaskItem({
           <Star className={`w-3.5 h-3.5 ${task.isTop3 ? 'fill-current' : ''}`} />
         </button>
 
-        {task.dueDate && (
-          <span className="text-[10px] text-[var(--paper-muted)] font-mono">
-            {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+        {validDue && (
+          <span className="flex items-center gap-1 shrink-0">
+            <span
+              className={`text-[10px] font-mono ${
+                isOverdue ? 'text-red-500' : 'text-[var(--paper-muted)]'
+              }`}
+              title={isOverdue ? 'Overdue' : 'Due date'}
+            >
+              {formatDateDDMMShort(validDue)}
+            </span>
+            {isOverdue && (
+              <span className="text-[9px] font-mono uppercase text-red-500 tracking-wider">
+                overdue
+              </span>
+            )}
           </span>
         )}
 

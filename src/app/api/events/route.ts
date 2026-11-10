@@ -4,18 +4,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { appDayStart, parseFlexibleDate } from '@/lib/date';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const days = Math.min(Math.max(Number(searchParams.get('days')) || 60, 1), 365);
+  const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 300, 1), 1000);
+
   // Events from the app's current day onwards (the day rolls over at 05:00).
   const startOfToday = appDayStart();
+  const windowEnd = new Date(startOfToday);
+  windowEnd.setDate(windowEnd.getDate() + days);
+  windowEnd.setHours(23, 59, 59, 999);
 
   const events = await prisma.scheduleEvent.findMany({
     where: {
       date: {
         gte: startOfToday,
+        lte: windowEnd,
       },
     },
     orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-    take: 10,
+    take: limit,
     include: {
       domain: true,
       calendar: true,

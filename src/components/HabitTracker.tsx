@@ -12,7 +12,20 @@ import {
   Moon,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
-import { toISODate, formatDateYYYYMMDD, formatDateDDMMYYYY, appDayStart } from '@/lib/date';
+import {
+  toISODate,
+  formatDateYYYYMMDD,
+  formatDateDDMMYYYY,
+  formatDateDDMMShort,
+  formatMonthYear,
+  appDayStart,
+  addMonthsClamped,
+  getWeekStart,
+  getWeekEnd,
+  monthDatesISO,
+  parseISODateLocal,
+  weekDatesISO,
+} from '@/lib/date';
 import { Routine } from '@/types';
 import { EditRoutineModal } from '@/components/EditRoutineModal';
 import { CalendarDateInput } from '@/components/CalendarDateInput';
@@ -53,26 +66,40 @@ export function HabitTracker({
     loadHabitHistory();
   }, [loadHabitHistory]);
 
-  // Date range for WEEK & MONTH (horizontal strip)
-  const dateRange = useMemo(() => {
-    const dates: string[] = [];
-    const base = new Date(selectedDate || todayStr);
-    const count = activeViewMode === 'WEEK' ? 7 : 30;
+  // Anchor date the matrix is built around (the selected day).
+  const anchorDate = useMemo(
+    () => parseISODateLocal(selectedDate || todayStr),
+    [selectedDate, todayStr]
+  );
 
-    for (let i = count - 1; i >= 0; i--) {
-      const d = new Date(base);
-      d.setDate(d.getDate() - i);
-      dates.push(formatDateYYYYMMDD(d));
+  // Date range for WEEK & MONTH (horizontal strip).
+  // These are calendar-aligned windows, not rolling ones:
+  //   WEEK  -> Monday through Sunday of the anchor's week.
+  //   MONTH -> the 1st through the last day of the anchor's month
+  //            (e.g. 1 Nov - 30 Nov, 1 Feb - 28 Feb).
+  const dateRange = useMemo(() => {
+    if (activeViewMode === 'WEEK') return weekDatesISO(anchorDate);
+    if (activeViewMode === 'MONTH') return monthDatesISO(anchorDate);
+    return [];
+  }, [anchorDate, activeViewMode]);
+
+  // Label of the period currently on screen.
+  const periodLabel = useMemo(() => {
+    if (activeViewMode === 'MONTH') return formatMonthYear(anchorDate);
+    if (activeViewMode === 'WEEK') {
+      const start = getWeekStart(anchorDate);
+      const end = getWeekEnd(anchorDate);
+      return `${formatDateDDMMShort(start)} – ${formatDateDDMMShort(end)}`;
     }
-    return dates;
-  }, [selectedDate, todayStr, activeViewMode]);
+    return '';
+  }, [activeViewMode, anchorDate]);
 
   // Date grid for YEAR (GitHub 7 rows: Mon-Sun, 52 columns: weeks)
   const yearlyGrid = useMemo(() => {
     if (activeViewMode !== 'YEAR') return null;
 
     // Anchor on the end of the current week (Sunday)
-    const end = new Date(selectedDate || todayStr);
+    const end = new Date(anchorDate);
     const dayOfWeek = (end.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
     end.setDate(end.getDate() + (6 - dayOfWeek));
 
@@ -94,13 +121,25 @@ export function HabitTracker({
       weeks.push(weekDays);
     }
     return weeks;
-  }, [selectedDate, todayStr, activeViewMode]);
+  }, [anchorDate, activeViewMode]);
 
   const handleStepDate = (direction: 'prev' | 'next') => {
-    const curr = new Date(selectedDate || todayStr);
-    const step = activeViewMode === 'WEEK' ? 7 : activeViewMode === 'MONTH' ? 30 : 90;
-    curr.setDate(curr.getDate() + (direction === 'next' ? step : -step));
-    setSelectedDate(formatDateYYYYMMDD(curr));
+    const delta = direction === 'next' ? 1 : -1;
+    let next: Date;
+
+    if (activeViewMode === 'WEEK') {
+      // Move one calendar week forward/backward.
+      next = new Date(anchorDate);
+      next.setDate(next.getDate() + 7 * delta);
+    } else if (activeViewMode === 'MONTH') {
+      // Move one calendar month forward/backward (day clamped to month length).
+      next = addMonthsClamped(anchorDate, delta);
+    } else {
+      next = new Date(anchorDate);
+      next.setDate(next.getDate() + 90 * delta);
+    }
+
+    setSelectedDate(formatDateYYYYMMDD(next));
   };
 
   const handleSaveModalEdit = async (id: string, updates: any) => {
@@ -271,6 +310,11 @@ export function HabitTracker({
         <div className="flex items-center gap-2">
           <Flame className="w-5 h-5 text-[var(--paper-accent)]" />
           <h2 className="font-bold text-base text-[var(--paper-text)]">{title}</h2>
+          {periodLabel && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] text-[var(--paper-muted)]">
+              {periodLabel}
+            </span>
+          )}
           {isTodayOnly && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] text-[var(--paper-muted)]">
               Due Today ({visibleRoutines.length})

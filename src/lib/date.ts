@@ -61,6 +61,16 @@ export function appDayStart(now: Date = new Date()): Date {
 }
 
 /**
+ * End of the app's current day (exclusive) as a Date, i.e. the midnight that
+ * starts the next app day. Used to tell "due today" apart from "overdue".
+ */
+export function appDayEnd(now: Date = new Date()): Date {
+  const end = appDayStart(now);
+  end.setDate(end.getDate() + 1);
+  return end;
+}
+
+/**
  * Today's date in the local timezone as YYYY-MM-DD, honouring the 05:00 day
  * boundary: between midnight and 05:00 this returns yesterday's date.
  */
@@ -186,4 +196,113 @@ export function getWeekEnd(date: Date = new Date()): Date {
 /** Local calendar date as YYYY-MM-DD string. */
 export function formatDateYYYYMMDD(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const MONTH_NAMES_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/**
+ * Parses a YYYY-MM-DD string into a local Date at midnight.
+ * `new Date('2026-11-10')` would be parsed as UTC and could shift the day in
+ * western timezones, so date-only strings are always built from their parts.
+ */
+export function parseISODateLocal(iso: string): Date {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date(iso);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+/** First day of the month containing `date`, at local midnight. */
+export function getMonthStart(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return d;
+}
+
+/** Number of days in the month containing `date` (28–31). */
+export function daysInMonth(date: Date): number {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
+/**
+ * Every calendar day of the month containing `date` as YYYY-MM-DD strings,
+ * from the 1st through the last day of that month.
+ */
+export function monthDatesISO(date: Date): string[] {
+  const start = getMonthStart(date);
+  const count = daysInMonth(start);
+  const dates: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dates.push(formatDateYYYYMMDD(d));
+  }
+  return dates;
+}
+
+/**
+ * Every calendar day of the week containing `date` as YYYY-MM-DD strings,
+ * from Monday through Sunday.
+ */
+export function weekDatesISO(date: Date): string[] {
+  const start = getWeekStart(date);
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dates.push(formatDateYYYYMMDD(d));
+  }
+  return dates;
+}
+
+/**
+ * Moves `date` by whole months, clamping to the last day of the target month
+ * (31 Jan + 1 month → 28/29 Feb instead of spilling into March).
+ */
+export function addMonthsClamped(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  d.setDate(Math.min(day, daysInMonth(d)));
+  return d;
+}
+
+/** Month and year label, e.g. "November 2026". */
+export function formatMonthYear(date: Date): string {
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** Compact date label, e.g. "10 Nov". */
+export function formatDateDDMMShort(date: Date): string {
+  return `${pad(date.getDate())} ${MONTH_NAMES_SHORT[date.getMonth()]}`;
 }

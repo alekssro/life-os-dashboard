@@ -1,6 +1,12 @@
 import { prisma } from '@/lib/prisma';
 import { parseICS } from './icsParser';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// How far back and forward the feeds are synced and recurrences expanded.
+const PAST_WINDOW_DAYS = 3;
+const FUTURE_WINDOW_DAYS = 60;
+
 export async function syncActiveCalendars() {
   const activeCalendars = await prisma.connectedCalendar.findMany({
     where: { isActive: true },
@@ -38,12 +44,15 @@ export async function syncActiveCalendars() {
         }
 
         const icsText = await res.text();
-        const parsedEvents = parseICS(icsText);
 
         // Filter events within window: past 3 days up to next 60 days
         const now = new Date();
-        const pastWindow = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-        const futureWindow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+        const pastWindow = new Date(now.getTime() - PAST_WINDOW_DAYS * DAY_MS);
+        const futureWindow = new Date(now.getTime() + FUTURE_WINDOW_DAYS * DAY_MS);
+
+        // parseICS expands recurring series (RRULE) into per-occurrence events
+        // and applies EXDATE / RECURRENCE-ID overrides within this window.
+        const parsedEvents = parseICS(icsText, { start: pastWindow, end: futureWindow });
 
         const relevant = parsedEvents.filter(
           (e) => e.date >= pastWindow && e.date <= futureWindow
@@ -78,6 +87,20 @@ export async function syncActiveCalendars() {
         await prisma.connectedCalendar.update({
           where: { id: cal.id },
           data: { lastSyncedAt: new Date() },
+        });
+
+        // Drop rows for this calendar that are no longer in the feed (deleted
+        // or rescheduled events, and old master rows from before recurrence
+        // expansion). Scoped to calendarId so manually created events are
+        // never touched.
+        const externalIds = relevant.map((e) => e.externalId);
+        await prisma.scheduleEvent.deleteMany({
+          where: {
+            calendarId: cal.id,
+            ...(externalIds.length > 0
+              ? { externalId: { notIn: externalIds } }
+              : {}),
+          },
         });
 
         totalSynced += relevant.length;

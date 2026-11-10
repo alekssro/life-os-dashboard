@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { TaskStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { parseFlexibleDate } from '@/lib/date';
 import { pushSuperlistCompletion, pushSuperlistUpdate } from '@/lib/superlistWrite';
@@ -6,6 +7,8 @@ import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
 const REMINDER_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
 const REMINDER_TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+const TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'WAITING', 'DONE', 'CANCELLED'];
 
 /**
  * Reminder for the daily notification digest:
@@ -227,13 +230,45 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const status = searchParams.get('status');
 
-  if (!id) {
-    return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
+    if (!id && !status) {
+      return NextResponse.json({ error: 'Missing task id or status' }, { status: 400 });
+    }
+
+    // Bulk delete by status — powers "Clear completed".
+    // Superlist has no delete API, so those tasks stay completed there and
+    // are simply not re-created locally on the next sync.
+    if (status) {
+      const requested = status
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+      const valid = requested.filter((s): s is TaskStatus =>
+        (TASK_STATUSES as string[]).includes(s)
+      );
+
+      if (valid.length === 0) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+      }
+
+      const { count } = await prisma.task.deleteMany({
+        where: { status: { in: valid } },
+      });
+      return NextResponse.json({ success: true, deleted: count });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
+    }
+
+    await prisma.task.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
-
-  await prisma.task.delete({ where: { id } });
-  return NextResponse.json({ success: true });
 }
