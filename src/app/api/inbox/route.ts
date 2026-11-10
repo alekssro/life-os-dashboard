@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate } from '@/lib/date';
+import { parseFlexibleDate, withCalendarDueDate } from '@/lib/date';
 import { buildSuperlistTaskUrl } from '@/lib/superlist';
 import { ensureSuperlistListForDomain } from '@/lib/superlistDomains';
 import { pushSuperlistTaskMove } from '@/lib/superlistWrite';
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         data: { status: 'TRIAGED', suggestedDomain: domainId },
       });
 
-      return NextResponse.json({ success: true, action, task, superlistWarning });
+      return NextResponse.json({ success: true, action, task: withCalendarDueDate(task), superlistWarning });
     }
 
     if (action === 'READING') {
