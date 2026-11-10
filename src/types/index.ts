@@ -104,6 +104,20 @@ export interface Routine {
   streak: number;
   bestStreak: number;
   lastCompletedDate?: string | null;
+  /** Unit the streak is counted in: DAY, WEEK or MONTH (per frequency). */
+  streakUnit?: 'DAY' | 'WEEK' | 'MONTH' | null;
+  /** Human label, e.g. "3 weeks". */
+  streakLabel?: string | null;
+  /** Compact label, e.g. "3w". */
+  streakShortLabel?: string | null;
+  /** Plural unit name, e.g. "weeks". */
+  streakUnitLabel?: string | null;
+  /** The current period is still running and not completed yet. */
+  atRisk?: boolean;
+  /** Missed periods currently covered by grace. */
+  graceUsed?: number;
+  /** Whether the current period (day/week/month) is completed. */
+  completedCurrentPeriod?: boolean;
   consistencyScore: number;
   graceDays: number;
   targetPerWeek: number;

@@ -8,7 +8,7 @@ A personal operations dashboard and life management system inspired by the case-
 
 1. **Today Briefing & Attention Engine**
    - **Top 3 Daily Focus**: Star tasks from your master queue to focus your day.
-   - **Attention / Slipping Engine**: Automatically surfaces quiet projects (no activity for 14+ days), neglected contacts needing follow-up, and overdue tasks.
+   - **Attention / Slipping Engine**: Automatically surfaces quiet projects (no activity for 14+ days) and overdue tasks.
    - **Daily Routines**: Morning, Afternoon, and Evening habits with gentle resilience and streak tracking (avoiding streak guilt/burnout).
    - **Up Next Schedule**: Daily calendar and upcoming appointment agenda.
    - **Resurfacing Widget**: Daily rotating quote, book highlight, or note.
@@ -42,11 +42,37 @@ A personal operations dashboard and life management system inspired by the case-
 6. **Integrated Modules**
    - **Tasks**: Full task management with domain filtering, recurring schedules (`↺ WEEKLY`, `↺ MONTHLY`), and due dates.
    - **Routines**: Morning, Afternoon, and Evening anchors.
-   - **Projects**: Milestone deliverables, Monthly Retainers (hours logging & monthly budget), and Ongoing Areas.
    - **Content Pipeline**: Video and article kanban pipeline (Idea → Scripting → Recording → Editing → Published).
-   - **People & CRM**: Lightweight relationship tracking, family details (spouse, kids, personal notes), and follow-up window tracking.
    - **Library & Quotes**: Highlights and daily resurfacing engine.
    - **Domains**: High-level life buckets (Work, Content, Home, Health, Finance).
+
+### Streaks follow the habit's own rhythm
+
+A habit's streak is counted in the period its schedule produces, so the number
+always means the same thing:
+
+| Habit      | Period    | Streak counts            | "3" means        |
+|------------|-----------|--------------------------|------------------|
+| `DAILY`    | day       | consecutive days         | 3 days in a row  |
+| `WEEKLY`   | week      | consecutive weeks        | 3 weeks in a row |
+| `MONTHLY`  | month     | consecutive months       | 3 months in a row |
+
+- One completion per period is enough — a weekly habit counts the week as hit
+  with a single completion, matching the one-square-per-week matrix.
+- **The running period is protected**: an unfinished period never breaks the
+  chain, it is flagged *due* until the period closes. A daily habit therefore
+  keeps its streak on the morning you have not done it yet.
+- **Grace** (`Grace: missed days/weeks/months`) tolerates that many missed
+  periods in a row before the chain breaks, and the UI reports when a chain is
+  currently surviving on grace.
+- **Consistency** is the completion rate over the trailing window of closed
+  periods (28 days / 8 weeks / 6 months), so it is comparable across habits.
+- Streak, personal best and consistency are all derived from the same log
+  history on every read (`src/lib/streaks.ts`), so they can never disagree and
+  a day that passes without a completion decays the streak immediately.
+  `scripts/verify-streaks.ts` checks the engine against fixed scenarios.
+
+> **Note**: the standalone **Projects** and **People** screens were removed from the dashboard — project health still surfaces through *Attention* and *Weekly Review*, and contacts are tracked in Obsidian (a future sync is planned). The underlying `/api/projects`, `/api/contacts` and `/api/interactions` endpoints and their database tables remain in place for that sync.
 
 ---
 

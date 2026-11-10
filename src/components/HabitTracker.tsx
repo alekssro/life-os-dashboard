@@ -57,6 +57,13 @@ const DAILY_VIEWS: { id: ViewMode; label: string }[] = [
   { id: 'YEAR', label: 'Year' },
 ];
 
+/** Compact suffix for the streak unit: days, weeks or months. */
+function unitSuffix(routine: Routine): string {
+  if (routine.streakUnit === 'WEEK') return 'w';
+  if (routine.streakUnit === 'MONTH') return 'mo';
+  return 'd';
+}
+
 const WEEKLY_VIEWS: { id: ViewMode; label: string }[] = [
   { id: 'MONTH', label: 'Month' },
   { id: 'YEAR', label: 'Year' },
@@ -451,12 +458,23 @@ export function HabitTracker({
           </span>
 
           <span className="flex items-center gap-2 text-xs font-mono shrink-0 ml-auto">
-            <span className="flex items-center gap-1 text-[var(--paper-accent)] font-bold">
+            <span
+              className={`flex items-center gap-1 font-bold ${
+                routine.atRisk ? 'text-amber-500' : 'text-[var(--paper-accent)]'
+              }`}
+              title={
+                routine.atRisk
+                  ? `This ${routine.streakUnitLabel?.replace(/s$/, '') || 'period'} is still open — the streak survives until it closes.`
+                  : `${routine.streakLabel || routine.streak} in a row`
+              }
+            >
               <Flame className="w-3.5 h-3.5 fill-current" />
-              {routine.streak}d
+              {routine.streakShortLabel ?? `${routine.streak}${unitSuffix(routine)}`}
+              {routine.atRisk && <span className="text-[9px] font-normal">due</span>}
             </span>
             <span className="text-[var(--paper-muted)] hidden sm:inline">
-              Best: {routine.bestStreak}d
+              Best: {routine.bestStreak}
+              {unitSuffix(routine)}
             </span>
           </span>
         </div>

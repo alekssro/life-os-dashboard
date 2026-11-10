@@ -106,7 +106,7 @@ export function WeeklyReviewView() {
 ${data.completedTasks.map((t: any) => `- ${t.title}${t.domain ? ` [${t.domain.name}]` : ''}${t.project ? ` (${t.project.title})` : ''}`).join('\n') || 'No tasks completed this week.'}
 
 ## 🔥 Routine Consistency
-${data.routines.map((r: any) => `- ${r.icon} ${r.title}: ${r.consistencyScore}% (streak: ${r.streak})`).join('\n') || 'No routines tracked.'}
+${data.routines.map((r: any) => `- ${r.icon} ${r.title}: ${r.consistencyScore}% consistency (streak: ${r.streakLabel ?? r.streak})`).join('\n') || 'No routines tracked.'}
 
 ## 📊 Project Health
 ${data.projects.map((p: any) => {
@@ -297,8 +297,11 @@ ${notes.nextWeekFocus || '_(add your thoughts)_'}
                         {r.consistencyScore}%
                       </span>
                       {r.streak > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] font-mono text-[var(--paper-muted)]">
-                          🔥 {r.streak}
+                        <span
+                          className="flex items-center gap-1 text-[10px] font-mono text-[var(--paper-muted)]"
+                          title={r.streakLabel || undefined}
+                        >
+                          🔥 {r.streakShortLabel ?? r.streak}
                         </span>
                       )}
                     </div>

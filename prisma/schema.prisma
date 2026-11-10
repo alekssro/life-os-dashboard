@@ -189,11 +189,11 @@ model Routine {
   order             Int              @default(0)
   active            Boolean          @default(true)
   icon              String?          // emoji or icon name
-  streak            Int              @default(0)
-  bestStreak        Int              @default(0)
+  streak            Int              @default(0)   // Consecutive completed periods (days/weeks/months per frequency)
+  bestStreak        Int              @default(0)   // Longest run of consecutive completed periods
   lastCompletedDate String?          // YYYY-MM-DD
-  consistencyScore  Float            @default(0)   // 0-100 rolling weekly consistency
-  graceDays         Int              @default(1)   // Missed days allowed before penalty
+  consistencyScore  Float            @default(0)   // 0-100 completion rate over the trailing window of periods
+  graceDays         Int              @default(1)   // Missed periods tolerated in a row before the streak breaks
   targetPerWeek     Int              @default(7)   // Target completions per week
   superlistId       String?          @unique       // Superlist task UUID (recurring source)
   superlistListId   String?                        // Superlist list UUID this routine came from

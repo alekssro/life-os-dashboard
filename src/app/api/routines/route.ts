@@ -2,35 +2,22 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { appDayStart, todayISO, toISODate, getWeekStart, getWeekEnd, formatDateYYYYMMDD } from '@/lib/date';
+import { appDayStart, todayISO, toISODate } from '@/lib/date';
 import { isDueToday } from '@/lib/routines';
+import { computeStreak, StreakStats } from '@/lib/streaks';
 import { pushSuperlistCompletion } from '@/lib/superlistWrite';
 
-function calculateConsistencyScore(routine: any, logs: any[]): number {
-  // Score the week of the app's current day (rolls over at 05:00), so a
-  // late-night completion still counts against the day it belongs to.
-  const weekStart = getWeekStart(appDayStart());
-  const weekEnd = getWeekEnd(appDayStart());
-
-  const dueDatesInWeek: string[] = [];
-  const current = new Date(weekStart);
-  while (current <= weekEnd) {
-    const dateStr = formatDateYYYYMMDD(current);
-    const tempRoutine = { ...routine, frequency: routine.frequency, daysOfWeek: routine.daysOfWeek, dayOfMonth: routine.dayOfMonth };
-    if (isDueToday({ ...tempRoutine, frequency: routine.frequency, daysOfWeek: routine.daysOfWeek, dayOfMonth: routine.dayOfMonth }, current)) {
-      dueDatesInWeek.push(dateStr);
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  if (dueDatesInWeek.length === 0) return 100;
-
-  const completedInWeek = logs.filter((log) =>
-    dueDatesInWeek.includes(log.date) && log.completed
-  ).length;
-
-  const score = Math.round((completedInWeek / dueDatesInWeek.length) * 100);
-  return Math.min(100, Math.max(0, score));
+/**
+ * Recomputes a habit's streak statistics from its full completion history.
+ * The logs are the single source of truth — the cached columns on the routine
+ * row are only a mirror of this result.
+ */
+async function computeRoutineStreak(routineId: string, routine: any): Promise<StreakStats> {
+  const logs = await prisma.routineLog.findMany({
+    where: { routineId, completed: true },
+    select: { date: true },
+  });
+  return computeStreak(routine, logs.map((l) => l.date), appDayStart());
 }
 
 export async function GET() {
@@ -38,19 +25,13 @@ export async function GET() {
   // serving the previous day's routines as "today".
   const todayDate = appDayStart();
   const todayStr = toISODate(todayDate);
-  const weekStartStr = formatDateYYYYMMDD(getWeekStart(todayDate));
-  const weekEndStr = formatDateYYYYMMDD(getWeekEnd(todayDate));
 
   const routines = await prisma.routine.findMany({
     where: { active: true },
     include: {
       logs: {
-        where: {
-          date: {
-            gte: weekStartStr,
-            lte: weekEndStr,
-          },
-        },
+        where: { completed: true },
+        orderBy: { date: 'asc' },
       },
     },
     orderBy: [
@@ -60,32 +41,65 @@ export async function GET() {
     ],
   });
 
-  const formatted = routines.map((r) => {
-    const isDue = isDueToday(r, todayDate);
-    const todaysLog = r.logs.find((l) => l.date === todayStr);
-    const consistencyScore = calculateConsistencyScore(r, r.logs);
+  const formatted = await Promise.all(
+    routines.map(async (r) => {
+      const isDue = isDueToday(r, todayDate);
+      const todaysLog = r.logs.find((l) => l.date === todayStr);
 
-    return {
-      id: r.id,
-      title: r.title,
-      timeOfDay: r.timeOfDay,
-      frequency: r.frequency,
-      daysOfWeek: r.daysOfWeek,
-      dayOfMonth: r.dayOfMonth,
-      icon: r.icon,
-      order: r.order,
-      streak: r.streak,
-      bestStreak: r.bestStreak,
-      consistencyScore,
-      graceDays: r.graceDays,
-      targetPerWeek: r.targetPerWeek,
-      isDueToday: isDue,
-      isCompletedToday: !!todaysLog?.completed,
-      superlistId: r.superlistId,
-      superlistListId: r.superlistListId,
-      superlistUrl: r.superlistUrl,
-    };
-  });
+      // Streaks are derived from the logs on every read, so a day that passes
+      // without a completion decays the streak immediately instead of leaving
+      // a stale number on screen.
+      const streakStats = computeStreak(r, r.logs.map((l) => l.date), todayDate);
+      const lastCompletedDate = r.logs.length ? r.logs[r.logs.length - 1].date : null;
+
+      // Mirror the derived values back onto the row so any other consumer
+      // (notifications, exports) sees the same numbers.
+      if (
+        r.streak !== streakStats.streak ||
+        r.bestStreak !== streakStats.bestStreak ||
+        Math.round(r.consistencyScore) !== streakStats.consistencyScore ||
+        r.lastCompletedDate !== lastCompletedDate
+      ) {
+        await prisma.routine.update({
+          where: { id: r.id },
+          data: {
+            streak: streakStats.streak,
+            bestStreak: streakStats.bestStreak,
+            consistencyScore: streakStats.consistencyScore,
+            lastCompletedDate,
+          },
+        });
+      }
+
+      return {
+        id: r.id,
+        title: r.title,
+        timeOfDay: r.timeOfDay,
+        frequency: r.frequency,
+        daysOfWeek: r.daysOfWeek,
+        dayOfMonth: r.dayOfMonth,
+        icon: r.icon,
+        order: r.order,
+        streak: streakStats.streak,
+        bestStreak: streakStats.bestStreak,
+        streakUnit: streakStats.unit,
+        streakLabel: streakStats.label,
+        streakShortLabel: streakStats.shortLabel,
+        streakUnitLabel: streakStats.unitLabel,
+        atRisk: streakStats.atRisk,
+        graceUsed: streakStats.graceUsed,
+        completedCurrentPeriod: streakStats.completedCurrentPeriod,
+        consistencyScore: streakStats.consistencyScore,
+        graceDays: r.graceDays,
+        targetPerWeek: r.targetPerWeek,
+        isDueToday: isDue,
+        isCompletedToday: !!todaysLog?.completed,
+        superlistId: r.superlistId,
+        superlistListId: r.superlistListId,
+        superlistUrl: r.superlistUrl,
+      };
+    })
+  );
 
   const dueToday = formatted.filter((f) => f.isDueToday);
   const total = dueToday.length;
@@ -138,10 +152,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Routine not found' }, { status: 404 });
     }
 
-    const isDue = isDueToday(routine, new Date(targetDate));
-    const graceDays = routine.graceDays ?? 1;
-
-    // Allow logging past or scheduled dates without rejecting ad-hoc / historical edits
+    // Logging past or scheduled dates is allowed: historical edits are
+    // legitimate, and the streak is recomputed from the whole history anyway.
 
     // Snapshot the current log so we can tell a fresh completion from a repeat.
     const existingLog = await prisma.routineLog.findUnique({
@@ -154,96 +166,29 @@ export async function POST(req: NextRequest) {
         create: { routineId, date: targetDate, completed: true, loggedAt: new Date() },
         update: { completed: true, loggedAt: new Date() },
       });
-
-      const logs = await prisma.routineLog.findMany({
-        where: { routineId, completed: true },
-        orderBy: { date: 'desc' },
-        take: 50,
-      });
-
-      let newStreak = 0;
-      const checkDate = appDayStart();
-
-      for (const log of logs) {
-        const logDateObj = new Date(log.date);
-        const expectedDate = new Date(checkDate);
-        expectedDate.setDate(expectedDate.getDate() - newStreak);
-
-        if (isDueToday(routine, logDateObj) && formatDateYYYYMMDD(logDateObj) === formatDateYYYYMMDD(expectedDate)) {
-          newStreak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else if (logDateObj < expectedDate) {
-          break;
-        }
-      }
-
-      const newBestStreak = Math.max(newStreak, routine.bestStreak);
-
-      const weekStart = getWeekStart(appDayStart());
-      const weekEnd = getWeekEnd(appDayStart());
-      const weekLogs = await prisma.routineLog.findMany({
-        where: {
-          routineId,
-          date: { gte: formatDateYYYYMMDD(weekStart), lte: formatDateYYYYMMDD(weekEnd) },
-          completed: true,
-        },
-      });
-      const consistencyScore = calculateConsistencyScore(routine, weekLogs);
-
-      await prisma.routine.update({
-        where: { id: routineId },
-        data: {
-          streak: newStreak,
-          bestStreak: newBestStreak,
-          consistencyScore,
-          lastCompletedDate: targetDate,
-        },
-      });
     } else {
       await prisma.routineLog.deleteMany({ where: { routineId, date: targetDate } });
-
-      const logs = await prisma.routineLog.findMany({
-        where: { routineId, completed: true },
-        orderBy: { date: 'desc' },
-        take: 50,
-      });
-
-      let newStreak = 0;
-      const checkDate = appDayStart();
-
-      for (const log of logs) {
-        const logDateObj = new Date(log.date);
-        const expectedDate = new Date(checkDate);
-        expectedDate.setDate(expectedDate.getDate() - newStreak);
-
-        if (isDueToday(routine, logDateObj) && formatDateYYYYMMDD(logDateObj) === formatDateYYYYMMDD(expectedDate)) {
-          newStreak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else if (logDateObj < expectedDate) {
-          break;
-        }
-      }
-
-      const weekStart = getWeekStart(appDayStart());
-      const weekEnd = getWeekEnd(appDayStart());
-      const weekLogs = await prisma.routineLog.findMany({
-        where: {
-          routineId,
-          date: { gte: formatDateYYYYMMDD(weekStart), lte: formatDateYYYYMMDD(weekEnd) },
-          completed: true,
-        },
-      });
-      const consistencyScore = calculateConsistencyScore(routine, weekLogs);
-
-      await prisma.routine.update({
-        where: { id: routineId },
-        data: {
-          streak: newStreak,
-          consistencyScore,
-          lastCompletedDate: newStreak > 0 ? targetDate : null,
-        },
-      });
     }
+
+    // One recomputation for both paths: the streak, its personal best and the
+    // consistency score all come from the same log history, so they can never
+    // drift apart (and no longer depend on the habit's frequency).
+    const stats = await computeRoutineStreak(routineId, routine);
+    const lastLog = await prisma.routineLog.findFirst({
+      where: { routineId, completed: true },
+      orderBy: { date: 'desc' },
+      select: { date: true },
+    });
+
+    await prisma.routine.update({
+      where: { id: routineId },
+      data: {
+        streak: stats.streak,
+        bestStreak: stats.bestStreak,
+        consistencyScore: stats.consistencyScore,
+        lastCompletedDate: lastLog?.date ?? null,
+      },
+    });
 
     // Two-way completion sync: mirror a fresh completion of a linked routine to
     // Superlist (which rolls the recurring task forward to its next occurrence).

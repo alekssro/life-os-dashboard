@@ -64,7 +64,13 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
   });
   const [dayOfMonth, setDayOfMonth] = useState(String(routine.dayOfMonth || 1));
   const [graceDays, setGraceDays] = useState(routine.graceDays ?? 1);
-  const [targetPerWeek, setTargetPerWeek] = useState(routine.targetPerWeek ?? 7);
+  // Kept so the stored value round-trips untouched; the frequency-aware
+  // consistency score no longer uses a weekly target.
+  const targetPerWeek = routine.targetPerWeek ?? 7;
+
+  // Grace is expressed in the habit's own unit: days, weeks or months.
+  const graceUnitLabel =
+    frequency === 'WEEKLY' ? 'weeks' : frequency === 'MONTHLY' ? 'months' : 'days';
 
   const toggleDay = (d: number) =>
     setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
@@ -172,7 +178,9 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
       {/* Consistency settings */}
       <div className="flex flex-wrap gap-4 pt-2 border-t border-[var(--paper-border)]">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-mono text-[var(--paper-muted)]">Grace days:</label>
+          <label className="text-xs font-mono text-[var(--paper-muted)]">
+            Grace (missed {graceUnitLabel}):
+          </label>
           <input
             type="number"
             min={0}
@@ -180,19 +188,7 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
             value={graceDays}
             onChange={(e) => setGraceDays(parseInt(e.target.value) || 0)}
             className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
-            title="Days allowed to log after due date without penalty"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-mono text-[var(--paper-muted)]">Target/week:</label>
-          <input
-            type="number"
-            min={1}
-            max={7}
-            value={targetPerWeek}
-            onChange={(e) => setTargetPerWeek(parseInt(e.target.value) || 1)}
-            className="w-14 bg-[var(--paper-card-subtle)] text-[var(--paper-text)] px-2 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-center"
-            title="Expected completions per week for consistency scoring"
+            title={`How many ${graceUnitLabel} may be missed in a row before the streak breaks`}
           />
         </div>
       </div>

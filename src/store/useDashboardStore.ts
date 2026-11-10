@@ -253,8 +253,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       },
     };
 
-    const deltaStreak = nextCompleted ? 1 : Math.max(0, routine.streak - 1);
-
+    // Optimistic update: only the completion flag is faked. Streak, best streak
+    // and consistency are derived from the full log history on the server, so
+    // they cannot be guessed here — the refetch below brings the real numbers.
     set({
       routines: prevRoutines.map((r) =>
         r.id === routineId
@@ -262,10 +263,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
               ...r,
               isCompletedToday:
                 todayStr === toISODate(appDayStart()) ? nextCompleted : r.isCompletedToday,
-              streak:
-                todayStr === toISODate(appDayStart())
-                  ? (nextCompleted ? r.streak + 1 : Math.max(0, r.streak - 1))
-                  : r.streak,
             }
           : r
       ),
