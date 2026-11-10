@@ -8,7 +8,13 @@
  */
 
 import { resolveSuperlistAccessToken, tryRefreshStoredToken } from '@/lib/superlistOAuth';
-import { completeSuperlistTask as completeSuperlistTaskWithToken, updateSuperlistTask as updateSuperlistTaskWithToken, type UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
+import {
+  completeSuperlistTask as completeSuperlistTaskWithToken,
+  createSuperlistList as createSuperlistListWithToken,
+  moveSuperlistTask as moveSuperlistTaskWithToken,
+  updateSuperlistTask as updateSuperlistTaskWithToken,
+  type UpdateSuperlistTaskArgs,
+} from '@/lib/superlistSync';
 
 export interface SuperlistWriteResult {
   ok: boolean;
@@ -72,4 +78,69 @@ export async function pushSuperlistUpdate(taskUuid: string, args: UpdateSuperlis
     }
     return { ok: false, error: err?.message || 'Superlist update failed' };
   }
+}
+
+export interface SuperlistListWriteResult extends SuperlistWriteResult {
+  listId?: string;
+  url?: string | null;
+}
+
+/**
+ * Create a list in Superlist (used when a Life OS Domain has no list yet).
+ */
+export async function pushSuperlistListCreation(title: string): Promise<SuperlistListWriteResult> {
+  if (!title?.trim()) return { ok: false, error: 'Missing list title' };
+
+  const resolved = await resolveSuperlistAccessToken();
+  if (!resolved.ok) return { ok: false, error: resolved.message };
+
+  const attempt = async (token: string): Promise<SuperlistListWriteResult> => {
+    try {
+      const list = await createSuperlistListWithToken(token, title);
+      return { ok: true, listId: list.listId, url: list.url };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  };
+
+  const first = await attempt(resolved.token);
+  if (first.ok || !(first.error || '').includes('401')) return first;
+
+  const refreshed = await tryRefreshStoredToken();
+  if (!refreshed) {
+    return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
+  }
+  return attempt(refreshed);
+}
+
+/**
+ * Move a Superlist task into a list (or back to the inbox when listUuid is null).
+ */
+export async function pushSuperlistTaskMove(
+  taskUuid: string,
+  listUuid: string | null
+): Promise<SuperlistWriteResult> {
+  if (!taskUuid) return { ok: false, error: 'Missing Superlist task id' };
+
+  const resolved = await resolveSuperlistAccessToken();
+  if (!resolved.ok) return { ok: false, error: resolved.message };
+
+  const attempt = async (token: string): Promise<SuperlistWriteResult> => {
+    try {
+      await moveSuperlistTaskWithToken(token, taskUuid, listUuid);
+      return { ok: true };
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      return { ok: false, error: err?.message || 'Superlist move failed', status: err?.status } as SuperlistWriteResult;
+    }
+  };
+
+  const first = await attempt(resolved.token);
+  if (first.ok || !(first.error || '').includes('401')) return first;
+
+  const refreshed = await tryRefreshStoredToken();
+  if (!refreshed) {
+    return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
+  }
+  return attempt(refreshed);
 }

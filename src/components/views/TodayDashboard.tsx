@@ -38,11 +38,23 @@ import { CalendarView } from '@/components/CalendarView';
 import { HabitTracker } from '@/components/HabitTracker';
 import { ObsidianCapture } from '@/components/ObsidianCapture';
 import { EditTaskModal } from '@/components/EditTaskModal';
+import { TriageDomainModal } from '@/components/TriageDomainModal';
 import { useDashboardStore } from '@/store/useDashboardStore';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
   onOpenCapture: () => void;
+}
+
+/** Superlist details carried on an Inbox item's metadata blob. */
+function parseInboxMetadata(raw: any): { dueDate?: string | null; superlistId?: string | null } {
+  if (!raw) return {};
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProps) {
@@ -51,6 +63,12 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   const [inboxItems, setInboxItems] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [triageItem, setTriageItem] = useState<{
+    id: string;
+    title: string;
+    source?: string | null;
+    superlistId?: string | null;
+  } | null>(null);
 
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
   const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
@@ -89,6 +107,26 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
       body: JSON.stringify({ id: itemId, action }),
     });
     loadSecondaryData();
+  };
+
+  // "Own" opens the domain picker: a Superlist task has to be filed under a
+  // Domain, which gives it its list in Superlist.
+  const openTriage = (item: any) => {
+    setTriageItem({
+      id: item.id,
+      title: item.title,
+      source: item.source,
+      superlistId: item.superlistId,
+    });
+  };
+
+  const handleTriageAssigned = async (_domainId?: string, warning?: string) => {
+    setTriageItem(null);
+    if (warning) {
+      console.warn('Triage warning:', warning);
+    }
+    loadSecondaryData();
+    fetchDashboardData();
   };
 
   const completeOverdueTask = async (task: any) => {
@@ -333,10 +371,76 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             </div>
           )}
 
-          {/* 2. Calendar (Google Calendar feeds filtered by active focus mode) */}
+          {/* 2. Needs Review — hidden entirely when the inbox is clear */}
+          {inboxItems.length > 0 && (
+            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-[var(--paper-accent)]" />
+                  <h2 className="font-bold text-sm text-[var(--paper-text)]">Needs Review</h2>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-card-subtle)] text-[var(--paper-muted)]">
+                    {inboxItems.length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {inboxItems.slice(0, 3).map((item) => {
+                  const meta = parseInboxMetadata(item.metadata);
+                  const isSuperlist = item.source === 'SUPERLIST' || !!item.superlistId;
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-semibold text-[var(--paper-text)]">{item.title}</p>
+                        {isSuperlist && (
+                          <span className="shrink-0 text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border border-[var(--paper-border-strong)] text-[var(--paper-muted)]">
+                            Superlist
+                          </span>
+                        )}
+                      </div>
+
+                      {meta.dueDate && (
+                        <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)]">
+                          Due {formatDateDDMMYYYY(meta.dueDate)}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-1">
+                        <button
+                          onClick={() => openTriage(item)}
+                          className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
+                        >
+                          {isSuperlist ? 'Assign domain' : 'Own'}
+                        </button>
+                        {!isSuperlist && (
+                          <button
+                            onClick={() => handleTriageAction(item.id, 'READING')}
+                            className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
+                          >
+                            Reading
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleTriageAction(item.id, 'CLEAR')}
+                          className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] text-[var(--paper-muted)] hover:text-[var(--paper-text)]"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              </div>
+            </div>
+          )}
+          {/* 3. Calendar (Google Calendar feeds filtered by active focus mode) */}
           <CalendarView />
 
-          {/* 3. Resurfacing — hidden entirely when there is nothing to resurface */}
+          {/* 4. Resurfacing — hidden entirely when there is nothing to resurface */}
           {resurfacedItem && (
             <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-2.5">
               <div className="flex items-center gap-2 border-b border-[var(--paper-border)] pb-2.5">
@@ -356,52 +460,6 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             </div>
           )}
 
-          {/* 4. Needs Review — hidden entirely when the inbox is clear */}
-          {inboxItems.length > 0 && (
-            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-[var(--paper-accent)]" />
-                  <h2 className="font-bold text-sm text-[var(--paper-text)]">Needs Review</h2>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-card-subtle)] text-[var(--paper-muted)]">
-                    {inboxItems.length}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {inboxItems.slice(0, 3).map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2"
-                  >
-                    <p className="text-xs font-semibold text-[var(--paper-text)]">{item.title}</p>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <button
-                        onClick={() => handleTriageAction(item.id, 'OWN')}
-                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
-                      >
-                        Own
-                      </button>
-                      <button
-                        onClick={() => handleTriageAction(item.id, 'READING')}
-                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
-                      >
-                        Reading
-                      </button>
-                      <button
-                        onClick={() => handleTriageAction(item.id, 'CLEAR')}
-                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-muted)]"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-              </div>
-            </div>
-          )}
 
           {/* 5. Notifications — hidden entirely when there is nothing new */}
           {notifications.length > 0 && (
@@ -434,6 +492,14 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
           )}
         </div>
       </div>
+
+      {/* Triage an Inbox item under a Domain (required for Superlist tasks) */}
+      <TriageDomainModal
+        item={triageItem}
+        isOpen={!!triageItem}
+        onClose={() => setTriageItem(null)}
+        onAssigned={handleTriageAssigned}
+      />
     </div>
   );
 }

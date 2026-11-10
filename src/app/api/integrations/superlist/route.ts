@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate, withCalendarDueDate } from '@/lib/date';
+import { parseFlexibleDate, serializeDueDate, withCalendarDueDate } from '@/lib/date';
 import { validateApiKey } from '@/lib/auth';
 import { resolveSuperlistUrl } from '@/lib/superlist';
 import { pullSuperlistTasks } from '@/lib/superlistSync';
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const { tasks, lists, timezone } = pullResult;
+      const { tasks, lists, inboxTasks, timezone } = pullResult;
 
       // Map each Superlist list to a Life OS Domain (find linked -> match by
       // name -> create). Tasks then inherit the domain of their list.
@@ -260,6 +260,78 @@ export async function POST(req: NextRequest) {
         if (outcome.linked) domainsLinked++;
       }
 
+      // Superlist inbox tasks have no list, so they have no domain to inherit.
+      // They land in the dashboard Inbox ("Needs Review") instead, where the
+      // user files them under a Domain — which creates the Superlist list.
+      let inboxItemsCreated = 0;
+      let inboxItemsUpdated = 0;
+      const seenSuperlistIds = new Set<string>();
+
+      for (const item of inboxTasks) {
+        if (!item.title || !item.id) continue;
+        seenSuperlistIds.add(item.id);
+
+        const metadata = JSON.stringify({
+          superlistId: item.id,
+          listId: null,
+          url: item.url,
+          // Calendar day, so the date reads the same in every browser.
+          dueDate: serializeDueDate(item.dueDate),
+          priority: item.priority,
+        });
+        const rawContent = item.dueDate
+          ? `${item.title} (due ${item.dueDate})`
+          : item.title;
+
+        const existing = await prisma.inboxItem.findUnique({
+          where: { superlistId: item.id },
+        });
+
+        if (existing) {
+          if (existing.status === 'NEEDS_REVIEW') {
+            await prisma.inboxItem.update({
+              where: { id: existing.id },
+              data: { title: item.title, rawContent, metadata },
+            });
+            inboxItemsUpdated++;
+          }
+          continue;
+        }
+
+        await prisma.inboxItem.create({
+          data: {
+            title: item.title,
+            rawContent,
+            source: 'SUPERLIST',
+            status: 'NEEDS_REVIEW',
+            suggestedType: 'TASK',
+            metadata,
+            superlistId: item.id,
+          },
+        });
+        inboxItemsCreated++;
+      }
+
+      // Superlist inbox items that left the Superlist inbox (moved to a list
+      // or completed there) are archived, so Needs Review only shows what is
+      // actually waiting.
+      const staleInboxItems = await prisma.inboxItem.findMany({
+        where: {
+          source: 'SUPERLIST',
+          status: 'NEEDS_REVIEW',
+          superlistId: { not: null },
+        },
+      });
+      let inboxItemsArchived = 0;
+      for (const stale of staleInboxItems) {
+        if (stale.superlistId && seenSuperlistIds.has(stale.superlistId)) continue;
+        await prisma.inboxItem.update({
+          where: { id: stale.id },
+          data: { status: 'ARCHIVED' },
+        });
+        inboxItemsArchived++;
+      }
+
       let created = 0;
       let updated = 0;
       let skipped = 0;
@@ -270,6 +342,9 @@ export async function POST(req: NextRequest) {
 
       for (const item of tasks) {
         if (!item.title || !item.id) continue;
+
+        // Inbox tasks are handled above (they wait for review in the Inbox).
+        if (!item.listId) continue;
 
         const listDomainId = item.listId ? domainIdByListId[item.listId] ?? null : null;
 
@@ -404,12 +479,18 @@ export async function POST(req: NextRequest) {
       const domainsUnchanged = lists.length - domainsCreated - domainsLinked;
       return NextResponse.json({
         success: true,
-        message: `Synced ${tasks.length} tasks from ${lists.length} lists (${created} created, ${updated} updated, ${skipped} completed skipped). Routines: ${routinesCreated} created, ${routinesUpdated} updated, ${routinesDeactivated} deactivated (${tasksRemoved} tasks moved). Domains: ${domainsCreated} created, ${domainsLinked} linked, ${domainsUnchanged} unchanged.`,
+        message: `Synced ${tasks.length} tasks from ${lists.length} lists (${created} created, ${updated} updated, ${skipped} completed skipped). Routines: ${routinesCreated} created, ${routinesUpdated} updated, ${routinesDeactivated} deactivated (${tasksRemoved} tasks moved). Domains: ${domainsCreated} created, ${domainsLinked} linked, ${domainsUnchanged} unchanged. Inbox: ${inboxItemsCreated} new for review, ${inboxItemsUpdated} refreshed, ${inboxItemsArchived} archived.`,
         lists: lists.length,
         total: tasks.length,
         created,
         updated,
         skipped,
+        inbox: {
+          superlistInbox: inboxTasks.length,
+          created: inboxItemsCreated,
+          updated: inboxItemsUpdated,
+          archived: inboxItemsArchived,
+        },
         routines: {
           created: routinesCreated,
           updated: routinesUpdated,

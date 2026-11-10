@@ -39,6 +39,8 @@ export interface SuperlistListItem {
 export interface SuperlistPullResult {
   tasks: SuperlistTaskItem[];
   lists: SuperlistListItem[];
+  /** Tasks that live in the Superlist inbox (not in any list). */
+  inboxTasks: SuperlistTaskItem[];
   /** Resolved IANA timezone of the authenticated user, when available. */
   timezone?: string;
 }
@@ -249,7 +251,53 @@ export async function pullSuperlistTasks(token: string): Promise<SuperlistPullRe
     }
   }
 
-  return { tasks, lists: listMeta, timezone };
+  // 5. Superlist inbox — tasks that are not in any list. They have no domain
+  //    to inherit, so they are synced for review instead of straight into the
+  //    dashboard's task lists.
+  const inboxTasks: SuperlistTaskItem[] = [];
+  try {
+    const inboxResp = await mcpRequest(
+      url,
+      token,
+      {
+        jsonrpc: '2.0',
+        id: callId++,
+        method: 'tools/call',
+        params: { name: 'inbox', arguments: {} },
+      },
+      init.sessionId
+    );
+    const inboxData = extractToolResult(inboxResp.message.result) || {};
+    const rawInbox = Array.isArray(inboxData.tasks)
+      ? inboxData.tasks
+      : Array.isArray(inboxData.items)
+        ? inboxData.items
+        : [];
+
+    for (const t of rawInbox) {
+      const taskId = t?.uuid || null;
+      if (!taskId) continue;
+      if (t.status === 'deleted') continue;
+      inboxTasks.push({
+        title: t.title || '',
+        id: taskId,
+        listId: null,
+        url: null,
+        dueDate: t.due_date || null,
+        isCompleted: t.status === 'completed',
+        completedAt: t.completed_at || null,
+        priority: PRIORITY_MAP[t.priority] || 'NORMAL',
+        isTop3: false,
+        notes: null,
+        repetition: t.repetition || null,
+      });
+    }
+  } catch (err) {
+    // A missing inbox endpoint must not break the list sync.
+    console.warn('Superlist inbox pull failed:', (err as Error).message);
+  }
+
+  return { tasks, lists: listMeta, inboxTasks, timezone };
 }
 
 /**
@@ -335,5 +383,60 @@ export async function updateSuperlistTask(token: string, args: UpdateSuperlistTa
       ? JSON.stringify((result as any).results).slice(0, 200)
       : JSON.stringify(result).slice(0, 200);
     throw new Error(`Superlist update_task failed: ${detail}`);
+  }
+}
+
+export interface SuperlistListResult {
+  listId: string;
+  url: string | null;
+}
+
+/**
+ * Create a new top-level list in Superlist. Used when a Life OS Domain has no
+ * Superlist list yet and a task needs to be filed under it.
+ */
+export async function createSuperlistList(token: string, title: string): Promise<SuperlistListResult> {
+  if (!token) throw new Error('Superlist token is not configured');
+  const name = (title || '').trim();
+  if (!name) throw new Error('Missing list title');
+
+  const result = await callSuperlistTool(token, 'add_list', { title: name });
+
+  if (result && typeof result === 'object' && 'success' in result && (result as any).success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist add_list failed: ${detail}`);
+  }
+
+  const list = result?.list || result?.data || result;
+  const listId = list?.uuid || list?.id || list?.list_uuid;
+  if (!listId) {
+    throw new Error('Superlist add_list did not return a list id');
+  }
+  return { listId, url: buildSuperlistListUrl(listId) };
+}
+
+/**
+ * Move a Superlist task into a list (or back to the inbox when no list is given).
+ */
+export async function moveSuperlistTask(
+  token: string,
+  taskUuid: string,
+  listUuid: string | null
+): Promise<void> {
+  if (!token) throw new Error('Superlist token is not configured');
+  if (!taskUuid) throw new Error('Missing Superlist task id');
+
+  const result = await callSuperlistTool(token, 'move_task', {
+    task_uuid: taskUuid,
+    list_uuid: listUuid ?? null,
+  });
+
+  if (result && typeof result === 'object' && 'success' in result && (result as any).success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist move_task failed: ${detail}`);
   }
 }

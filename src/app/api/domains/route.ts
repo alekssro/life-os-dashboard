@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ensureSuperlistListForDomain } from '@/lib/superlistDomains';
 
 export async function GET() {
   const domains = await prisma.domain.findMany({
@@ -30,7 +31,18 @@ export async function POST(req: NextRequest) {
         order: data.order || 0,
       },
     });
-    return NextResponse.json(domain, { status: 201 });
+
+    // A Domain owns a Superlist list, so tasks filed under it have a home
+    // there too. Best-effort: the domain still works without Superlist.
+    let superlistWarning: string | undefined;
+    const ensured = await ensureSuperlistListForDomain(domain.id);
+    if (!ensured.ok) {
+      superlistWarning = ensured.error || 'Could not create the Superlist list';
+    }
+
+    const fresh = superlistWarning ? domain : await prisma.domain.findUnique({ where: { id: domain.id } });
+
+    return NextResponse.json({ ...fresh, superlistWarning }, { status: 201 });
   } catch (error) {
     console.error('Error creating domain:', error);
     return NextResponse.json({ error: 'Failed to create domain' }, { status: 500 });

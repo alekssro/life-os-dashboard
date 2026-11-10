@@ -12,6 +12,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { buildSuperlistListUrl } from '@/lib/superlist';
+import { pushSuperlistListCreation } from '@/lib/superlistWrite';
 
 export interface SuperlistListMeta {
   id: string;
@@ -104,4 +105,42 @@ export async function resolveDomainIdForList(
     select: { id: true },
   });
   return domain?.id ?? null;
+}
+
+export interface EnsureListResult {
+  ok: boolean;
+  domainId: string;
+  /** The domain's Superlist list id, when it has one. */
+  listId?: string | null;
+  /** True when the list was created during this call. */
+  created?: boolean;
+  error?: string;
+}
+
+/**
+ * Make sure a Domain has a Superlist list, creating one when it does not.
+ *
+ * This is the mirror of findOrCreateDomainForList: a Domain created in the
+ * dashboard gets a list in Superlist, so tasks filed under it have a home
+ * there too. Failures are never fatal — the domain stays usable without it.
+ */
+export async function ensureSuperlistListForDomain(domainId: string): Promise<EnsureListResult> {
+  const domain = await prisma.domain.findUnique({ where: { id: domainId } });
+  if (!domain) return { ok: false, domainId, error: 'Domain not found' };
+
+  if (domain.superlistListId) {
+    return { ok: true, domainId, listId: domain.superlistListId, created: false };
+  }
+
+  const created = await pushSuperlistListCreation(domain.name);
+  if (!created.ok || !created.listId) {
+    return { ok: false, domainId, error: created.error || 'Could not create the Superlist list' };
+  }
+
+  await prisma.domain.update({
+    where: { id: domainId },
+    data: { superlistListId: created.listId, superlistUrl: created.url ?? buildSuperlistListUrl(created.listId) },
+  });
+
+  return { ok: true, domainId, listId: created.listId, created: true };
 }

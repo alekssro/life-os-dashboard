@@ -2,6 +2,28 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { parseFlexibleDate } from '@/lib/date';
+import { buildSuperlistTaskUrl } from '@/lib/superlist';
+import { ensureSuperlistListForDomain } from '@/lib/superlistDomains';
+import { pushSuperlistTaskMove } from '@/lib/superlistWrite';
+
+interface SuperlistInboxMetadata {
+  superlistId?: string;
+  listId?: string | null;
+  url?: string | null;
+  dueDate?: string | null;
+  priority?: string;
+}
+
+function parseMetadata(raw: string | null): SuperlistInboxMetadata {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as SuperlistInboxMetadata) : {};
+  } catch {
+    return {};
+  }
+}
 
 export async function GET() {
   const items = await prisma.inboxItem.findMany({
@@ -23,6 +45,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
+    const meta = parseMetadata(inboxItem.metadata);
+    const superlistId = inboxItem.superlistId || meta.superlistId || null;
+
     if (action === 'CLEAR') {
       await prisma.inboxItem.update({
         where: { id },
@@ -32,16 +57,61 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'OWN') {
-      // Create Task
-      await prisma.task.create({
-        data: {
-          title: inboxItem.title,
-          notes: inboxItem.rawContent,
-          status: 'TODO',
-          domainId: targetDomainId || null,
-        },
+      // A task that came from Superlist has no domain yet: the user must file
+      // it under one. That domain gets a Superlist list (created on demand) and
+      // the task is moved into it.
+      if (superlistId && !targetDomainId) {
+        return NextResponse.json(
+          { error: 'Pick a domain for this task — it will be filed under that list in Superlist.' },
+          { status: 400 }
+        );
+      }
+
+      let domainId = targetDomainId || null;
+      let superlistListId: string | null = null;
+      let superlistUrl: string | null = null;
+      let superlistWarning: string | undefined;
+
+      if (superlistId && domainId) {
+        const ensured = await ensureSuperlistListForDomain(domainId);
+        if (!ensured.ok || !ensured.listId) {
+          superlistWarning = ensured.error || 'Could not create the Superlist list';
+        } else {
+          superlistListId = ensured.listId;
+          superlistUrl = buildSuperlistTaskUrl(ensured.listId, superlistId);
+          const moved = await pushSuperlistTaskMove(superlistId, ensured.listId);
+          if (!moved.ok) {
+            superlistWarning = moved.error || 'Could not move the task in Superlist';
+          }
+        }
+      }
+
+      // Link the dashboard task to the Superlist task so later syncs update it.
+      const existingTask = superlistId
+        ? await prisma.task.findUnique({ where: { superlistId } })
+        : null;
+
+      const taskData = {
+        title: inboxItem.title,
+        notes: inboxItem.rawContent,
+        status: 'TODO' as const,
+        domainId,
+        ...(superlistId ? { superlistId, superlistListId, superlistUrl, source: 'SUPERLIST' as const } : {}),
+      };
+
+      const task = existingTask
+        ? await prisma.task.update({ where: { id: existingTask.id }, data: taskData })
+        : await prisma.task.create({ data: taskData });
+
+      await prisma.inboxItem.update({
+        where: { id },
+        data: { status: 'TRIAGED', suggestedDomain: domainId },
       });
-    } else if (action === 'READING') {
+
+      return NextResponse.json({ success: true, action, task, superlistWarning });
+    }
+
+    if (action === 'READING') {
       // Create Library Item
       await prisma.libraryItem.create({
         data: {
