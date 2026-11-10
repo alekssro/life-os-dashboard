@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TaskStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate } from '@/lib/date';
+import { appDayStart, parseFlexibleDate, serializeDueDate, withCalendarDueDate } from '@/lib/date';
 import { pushSuperlistCompletion, pushSuperlistUpdate } from '@/lib/superlistWrite';
 import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
@@ -70,7 +70,9 @@ export async function GET(req: NextRequest) {
     ],
   });
 
-  return NextResponse.json(tasks);
+  // Due dates travel as calendar days (YYYY-MM-DD) so the day never shifts
+  // with the browser's timezone.
+  return NextResponse.json(tasks.map(withCalendarDueDate));
 }
 
 export async function POST(req: NextRequest) {
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(task, { status: 201 });
+    return NextResponse.json(withCalendarDueDate(task), { status: 201 });
   } catch (error) {
     console.error('Error creating task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
@@ -153,11 +155,17 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (updates.dueDate) {
-      const parsedDueDate = parseFlexibleDate(updates.dueDate);
-      if (!parsedDueDate) {
-        return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
+      // "today" is resolved by the server, so the app's current day wins over
+      // whatever day the browser happens to think it is.
+      if (typeof updates.dueDate === 'string' && updates.dueDate.toLowerCase() === 'today') {
+        updates.dueDate = appDayStart();
+      } else {
+        const parsedDueDate = parseFlexibleDate(updates.dueDate);
+        if (!parsedDueDate) {
+          return NextResponse.json({ error: 'Invalid due date. Use dd/mm/yyyy.' }, { status: 400 });
+        }
+        updates.dueDate = parsedDueDate;
       }
-      updates.dueDate = parsedDueDate;
     }
 
     if (updates.reminderAt !== undefined) {
@@ -203,7 +211,9 @@ export async function PATCH(req: NextRequest) {
         updateArgs.notes = updates.notes;
       }
       if (updates.dueDate !== undefined && updates.dueDate !== existing.dueDate) {
-        updateArgs.due_date = updates.dueDate ? updates.dueDate.toISOString().split('T')[0] : null;
+        // The calendar day, not its UTC instant — midnight in Madrid is still
+        // the previous day in UTC.
+        updateArgs.due_date = serializeDueDate(updates.dueDate);
       }
       if (updates.priority !== undefined && updates.priority !== existing.priority) {
         const priorityMap: Record<string, 'high' | 'normal' | 'low'> = {
@@ -222,7 +232,11 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(superlistPush || superlistUpdate ? { ...task, superlistPush, superlistUpdate } : task);
+    return NextResponse.json(
+      superlistPush || superlistUpdate
+        ? { ...withCalendarDueDate(task), superlistPush, superlistUpdate }
+        : withCalendarDueDate(task)
+    );
   } catch (error) {
     console.error('Error updating task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

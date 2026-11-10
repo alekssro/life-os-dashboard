@@ -28,6 +28,7 @@ import {
   formatDateYYYYMMDD,
   formatTimeHHMM,
   formatWeekday,
+  parseISODateLocal,
   toISODate,
   todayISO,
 } from '@/lib/date';
@@ -118,8 +119,10 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   };
 
   // Re-plan an overdue task for today instead of leaving it in the past.
+  // "today" is resolved by the server, so the app's current day wins over
+  // whatever day the browser thinks it is.
   const scheduleTaskToday = async (task: any) => {
-    await scheduleTaskOn(task, todayISO());
+    await scheduleTaskOn(task, 'today');
   };
 
   const isTaskStarred = (taskId: string) => !!tasks.find((t) => t.id === taskId)?.isTop3;
@@ -127,7 +130,9 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   // The task's current due date as YYYY-MM-DD (used to highlight it in the picker).
   const dueDateISO = (task: any): string => {
     if (!task.dueDate) return '';
-    const d = new Date(task.dueDate);
+    // Due dates arrive as calendar days — parse them as local dates so they
+    // never slip a day in a browser west of the server.
+    const d = parseISODateLocal(task.dueDate);
     if (isNaN(d.getTime())) return '';
     return formatDateYYYYMMDD(d);
   };

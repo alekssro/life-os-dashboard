@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { appDayStart } from './date';
+import { appDayStart, serializeDueDate } from './date';
 
 export interface AttentionReport {
   slippingProjects: Array<{
@@ -42,7 +42,8 @@ export interface AttentionReport {
     id: string;
     title: string;
     domainName?: string;
-    dueDate: Date | null;
+    /** Calendar day (YYYY-MM-DD) so the date reads the same in every timezone. */
+    dueDate: string | null;
     daysOverdue: number;
   }>;
   needsReviewInboxCount: number;
@@ -182,7 +183,7 @@ export async function getAttentionReport(): Promise<AttentionReport> {
       id: t.id,
       title: t.title,
       domainName: t.domain?.name,
-      dueDate: t.dueDate,
+      dueDate: serializeDueDate(t.dueDate),
       daysOverdue: Math.max(1, diff),
     };
   });

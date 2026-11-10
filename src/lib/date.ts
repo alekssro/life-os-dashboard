@@ -79,6 +79,25 @@ export function todayISO(now: Date = new Date()): string {
 }
 
 /**
+ * A task's due date is a calendar day, not an instant. Serialising it as
+ * YYYY-MM-DD (in the app's timezone) keeps that day stable in every browser:
+ * an ISO timestamp resolves to the previous day in any timezone west of the
+ * server's, which made "schedule for today" show up as yesterday.
+ */
+export function serializeDueDate(dueDate: Date | string | null | undefined): string | null {
+  if (!dueDate) return null;
+  const iso = toISODate(dueDate);
+  return iso || null;
+}
+
+/** Serialises a task for the client with its due date as a calendar day. */
+export function withCalendarDueDate<T extends { dueDate?: Date | string | null }>(
+  task: T
+): T & { dueDate: string | null } {
+  return { ...task, dueDate: serializeDueDate(task.dueDate) };
+}
+
+/**
  * The real calendar day as YYYY-MM-DD, unaffected by the 05:00 boundary.
  * Use it when the user explicitly picks a date (due dates, "Today" button).
  */

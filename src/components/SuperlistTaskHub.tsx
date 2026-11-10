@@ -17,7 +17,7 @@ import { Task } from '@/types';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { filterTasksByFocus } from '@/lib/focusFilter';
 import { resolveSuperlistUrl } from '@/lib/superlist';
-import { appDayEnd, appDayStart, formatDateDDMMShort } from '@/lib/date';
+import { appDayEnd, appDayStart, formatDateDDMMShort, parseISODateLocal } from '@/lib/date';
 
 interface TaskHubProps {
   onOpenCapture?: () => void;
@@ -35,8 +35,8 @@ function isOpenTask(task: Task): boolean {
 
 /** Overdue first, then due today — the ones that need attention now. */
 function sortByDueDate(a: Task, b: Task): number {
-  const av = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
-  const bv = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  const av = a.dueDate ? parseISODateLocal(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+  const bv = b.dueDate ? parseISODateLocal(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
   if (av !== bv) return av - bv;
   return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
 }
@@ -56,7 +56,9 @@ function sortByCompletedAt(a: Task, b: Task): number {
  */
 function isDueTodayOrOverdue(task: Task, dayEnd: Date): boolean {
   if (!task.dueDate) return false;
-  const due = new Date(task.dueDate);
+  // Due dates are calendar days — parse them as local dates so the comparison
+  // does not slip a day in a browser west of the server.
+  const due = parseISODateLocal(task.dueDate);
   if (isNaN(due.getTime())) return false;
   return due.getTime() < dayEnd.getTime();
 }
@@ -324,7 +326,7 @@ function TaskItem({
     task.superlistId
   );
 
-  const due = task.dueDate ? new Date(task.dueDate) : null;
+  const due = task.dueDate ? parseISODateLocal(task.dueDate) : null;
   const validDue = due && !isNaN(due.getTime()) ? due : null;
   const isOverdue = !!validDue && !isDone && validDue.getTime() < appDayStart().getTime();
 

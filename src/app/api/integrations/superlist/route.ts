@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { parseFlexibleDate } from '@/lib/date';
+import { parseFlexibleDate, withCalendarDueDate } from '@/lib/date';
 import { validateApiKey } from '@/lib/auth';
 import { resolveSuperlistUrl } from '@/lib/superlist';
 import { pullSuperlistTasks } from '@/lib/superlistSync';
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
       configured: true,
       totalSynced,
       openCount,
-      tasks: superlistTasks,
+      tasks: superlistTasks.map(withCalendarDueDate),
       linkedProjects: projectsWithSuperlist,
       linkedDomains: domainsWithSuperlist,
       linkedRoutines: routinesWithSuperlist,

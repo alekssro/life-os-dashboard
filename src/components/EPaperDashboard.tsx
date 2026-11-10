@@ -21,7 +21,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { filterEventsByFocus, filterTasksByFocus } from '@/lib/focusFilter';
 import { FocusMode } from '@/types';
-import { formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, todayISO, toISODate } from '@/lib/date';
+import { formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, parseISODateLocal, todayISO, toISODate } from '@/lib/date';
 
 // Focus modes cycled by F2. Labels mirror the WORK/HOME concept of the
 // original reTerminal sketch using the app's real focus contexts.
@@ -190,8 +190,8 @@ export function EPaperDashboard() {
       if (a.isTop3 !== b.isTop3) return a.isTop3 ? -1 : 1;
       const pr = (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
       if (pr !== 0) return pr;
-      const ad = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
-      const bd = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      const ad = a.dueDate ? parseISODateLocal(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      const bd = b.dueDate ? parseISODateLocal(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
       return ad - bd;
     })
     .slice(0, 4);
