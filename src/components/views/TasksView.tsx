@@ -1,10 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  CheckSquare,
-  Filter,
-} from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { TaskHub } from '@/components/TaskHub';
 import { EditTaskModal } from '@/components/EditTaskModal';

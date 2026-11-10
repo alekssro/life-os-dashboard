@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckSquare,
   Square,
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Clock,
   Trash2,
+  Layers,
 } from 'lucide-react';
 import { Task } from '@/types';
 import { useDashboardStore } from '@/store/useDashboardStore';
@@ -68,7 +69,10 @@ export function TaskHub({
   defaultCollapsed = false,
 }: TaskHubProps) {
   const tasks = useDashboardStore((s) => s.tasks);
+  const domains = useDashboardStore((s) => s.domains);
   const focusMode = useDashboardStore((s) => s.focusMode);
+  const domainFilter = useDashboardStore((s) => s.domainFilter);
+  const setDomainFilter = useDashboardStore((s) => s.setDomainFilter);
   const toggleTaskOptimistic = useDashboardStore((s) => s.toggleTaskOptimistic);
   const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
   const clearCompletedTasks = useDashboardStore((s) => s.clearCompletedTasks);
@@ -78,9 +82,37 @@ export function TaskHub({
   const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
   const [clearError, setClearError] = useState<string | null>(null);
+  const [isDomainMenuOpen, setIsDomainMenuOpen] = useState(false);
+  const domainMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close the domain menu when clicking elsewhere.
+  useEffect(() => {
+    if (!isDomainMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (domainMenuRef.current && !domainMenuRef.current.contains(e.target as Node)) {
+        setIsDomainMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDomainMenuOpen]);
 
   // "Today" follows the app's 05:00 day boundary.
   const dayEnd = useMemo(() => appDayEnd(), []);
+
+  // Open tasks per domain — the counts shown in the filter menu.
+  const domainCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const task of tasks) {
+      if (!isOpenTask(task)) continue;
+      if (task.domainId) counts[task.domainId] = (counts[task.domainId] || 0) + 1;
+    }
+    return counts;
+  }, [tasks]);
+
+  const activeDomain = domainFilter
+    ? domains.find((d) => d.id === domainFilter) ?? null
+    : null;
 
   const { topTasks, todayTasks, otherTasks, completedTasks } = useMemo(() => {
     const openTasks = tasks.filter(isOpenTask);
@@ -88,11 +120,16 @@ export function TaskHub({
     // Focus mode narrows the actionable lists…
     const focused = filterTasksByFocus(openTasks, focusMode);
 
-    const top = focused.filter((t) => t.isTop3).sort(sortByDueDate);
-    const today = focused
+    // …and the domain filter narrows them further.
+    const filtered = domainFilter
+      ? focused.filter((t) => t.domainId === domainFilter)
+      : focused;
+
+    const top = filtered.filter((t) => t.isTop3).sort(sortByDueDate);
+    const today = filtered
       .filter((t) => !t.isTop3 && isDueTodayOrOverdue(t, dayEnd))
       .sort(sortByDueDate);
-    const other = focused
+    const other = filtered
       .filter((t) => !t.isTop3 && !isDueTodayOrOverdue(t, dayEnd))
       .sort(sortByDueDate);
 
@@ -106,7 +143,7 @@ export function TaskHub({
       otherTasks: other,
       completedTasks: completed,
     };
-  }, [tasks, focusMode, dayEnd]);
+  }, [tasks, focusMode, domainFilter, dayEnd]);
 
   const renderTaskList = (list: Task[]) =>
     list.map((task) => (
@@ -144,14 +181,98 @@ export function TaskHub({
     <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-3">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="w-5 h-5 text-[var(--paper-accent)]" />
+        <div className="flex items-center gap-2 min-w-0">
+          <CheckSquare className="w-5 h-5 text-[var(--paper-accent)] shrink-0" />
           <h2 className="font-bold text-base text-[var(--paper-text)]">{title}</h2>
           {showFocusBadge && focusMode !== 'ALL' && (
             <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] text-[var(--paper-muted)] flex items-center gap-1">
               <Filter className="w-2.5 h-2.5" />
               {focusMode.replace('_', ' ')}
             </span>
+          )}
+        </div>
+
+        {/* Filter by domain */}
+        <div className="relative shrink-0" ref={domainMenuRef}>
+          <button
+            onClick={() => setIsDomainMenuOpen((open) => !open)}
+            title="Filter tasks by domain"
+            aria-haspopup="listbox"
+            aria-expanded={isDomainMenuOpen}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-mono uppercase tracking-wider transition ${
+              activeDomain
+                ? 'border-[var(--paper-accent)] text-[var(--paper-accent)] bg-[var(--paper-card-subtle)]'
+                : 'border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] hover:border-[var(--paper-border-strong)]'
+            }`}
+          >
+            {activeDomain && (
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: activeDomain.color || 'var(--paper-accent)' }}
+              />
+            )}
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline max-w-[120px] truncate">
+              {activeDomain ? activeDomain.name : 'Domain'}
+            </span>
+            <ChevronDown className={`w-3 h-3 shrink-0 transition ${isDomainMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isDomainMenuOpen && (
+            <div
+              role="listbox"
+              className="absolute right-0 top-full mt-1.5 z-30 w-60 origin-top-right rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card)] shadow-xl ring-1 ring-[var(--paper-border)] animate-in fade-in-0 zoom-in-95 duration-150"
+            >
+              <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)] px-3 py-2">
+                Filter by domain
+              </p>
+              <div className="max-h-72 overflow-y-auto pb-1">
+                <button
+                  onClick={() => {
+                    setDomainFilter(null);
+                    setIsDomainMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition ${
+                    !domainFilter
+                      ? 'bg-[var(--paper-card-subtle)] text-[var(--paper-text)] font-semibold'
+                      : 'text-[var(--paper-muted)] hover:bg-[var(--paper-card-subtle)]'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 shrink-0" />
+                  <span className="flex-1">All domains</span>
+                </button>
+
+                {domains.map((domain) => {
+                  const count = domainCounts[domain.id] || 0;
+                  const isActive = domainFilter === domain.id;
+                  return (
+                    <button
+                      key={domain.id}
+                      onClick={() => {
+                        setDomainFilter(isActive ? null : domain.id);
+                        setIsDomainMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition ${
+                        isActive
+                          ? 'bg-[var(--paper-card-subtle)] text-[var(--paper-text)] font-semibold'
+                          : 'text-[var(--paper-muted)] hover:bg-[var(--paper-card-subtle)]'
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: domain.color || 'var(--paper-accent)' }}
+                      />
+                      <span className="flex-1 truncate">{domain.name}</span>
+                      <span className="text-[10px] font-mono text-[var(--paper-muted)]">{count}</span>
+                    </button>
+                  );
+                })}
+
+                {domains.length === 0 && (
+                  <p className="px-3 py-2 text-xs italic text-[var(--paper-muted)]">No domains yet.</p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>

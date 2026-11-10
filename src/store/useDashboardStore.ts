@@ -7,6 +7,10 @@ interface DashboardState {
   focusMode: FocusMode;
   setFocusMode: (mode: FocusMode) => void;
 
+  // Task filter by domain (null = every domain)
+  domainFilter: string | null;
+  setDomainFilter: (domainId: string | null) => void;
+
   // Sync Timestamp & Indicators
   lastSyncedAt: string | null;
   isSyncing: boolean;
@@ -41,6 +45,9 @@ interface DashboardState {
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   focusMode: 'ALL',
   setFocusMode: (focusMode) => set({ focusMode }),
+
+  domainFilter: null,
+  setDomainFilter: (domainFilter) => set({ domainFilter }),
 
   lastSyncedAt: null,
   isSyncing: false,
