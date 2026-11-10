@@ -375,6 +375,8 @@ export function HabitTracker({
     }
 
     // Month view (default): one square per week that begins in the month.
+    // The week's start day is shown in the section header, so the square
+    // itself stays empty.
     return (
       <div className="flex items-center gap-1.5">
         {weeklyMonth.weeks.map((weekStart) => {
@@ -386,8 +388,7 @@ export function HabitTracker({
               done={done}
               title={`Week of ${formatDateDDMMShort(weekStart)}: ${done ? 'Completed' : 'Missed'} (Click to toggle)`}
               onClick={() => toggle(routine, logDate)}
-              className="w-7 h-7 text-[9px]"
-              label={String(weekStart.getDate())}
+              className="w-6 h-6"
             />
           );
         })}
@@ -409,8 +410,7 @@ export function HabitTracker({
               done={done}
               title={`${formatMonthYear(monthStart)}: ${done ? 'Completed' : 'Missed'} (Click to toggle)`}
               onClick={() => toggle(routine, logDate)}
-              className="w-7 h-7 text-[9px]"
-              label={String(monthIndex + 1)}
+              className="w-6 h-6"
             />
           );
         })}
@@ -598,7 +598,7 @@ export function HabitTracker({
           {weeklyView === 'MONTH' &&
             renderColumnLabels(
               weeklyMonth.weeks.map((w) => String(w.getDate())),
-              'w-7 h-7'
+              'w-6 h-6'
             )}
 
           <div className="overflow-x-auto">
@@ -625,7 +625,10 @@ export function HabitTracker({
             showControls={showControls}
           />
 
-          {renderColumnLabels(MONTH_LABELS, 'w-7 h-7')}
+          {renderColumnLabels(
+            MONTH_LABELS.map((_, monthIndex) => String(monthIndex + 1)),
+            'w-6 h-6'
+          )}
 
           <div className="overflow-x-auto">
             {monthlyRoutines.map((r) => renderHabitRow(r, monthlyMatrix(r)))}
@@ -751,14 +754,12 @@ function MatrixCell({
   title,
   onClick,
   className,
-  label,
 }: {
   done: boolean;
   isToday?: boolean;
   title: string;
   onClick: () => void;
   className: string;
-  label?: string;
 }) {
   return (
     <button
@@ -770,8 +771,6 @@ function MatrixCell({
           ? 'bg-[var(--paper-accent)] border-[var(--paper-accent)] text-white'
           : 'bg-[var(--paper-card)] border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
       } ${isToday ? 'ring-1 ring-[var(--paper-accent)]' : ''}`}
-    >
-      {label}
-    </button>
+    />
   );
 }
