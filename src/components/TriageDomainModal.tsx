@@ -152,7 +152,7 @@ export function TriageDomainModal({ item, isOpen, onClose, onAssigned }: TriageD
               onClick={() => setSelected(domain.id)}
               className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-left transition ${
                 selected === domain.id
-                  ? 'border-[var(--paper-accent)] bg-[var(--paper-accent)]/10 text-[var(--paper-text)]'
+                  ? 'border-[var(--paper-accent)] bg-[color-mix(in_srgb,var(--paper-accent)_10%,transparent)] text-[var(--paper-text)]'
                   : 'border-[var(--paper-border)] hover:border-[var(--paper-border-strong)] text-[var(--paper-text)]'
               }`}
             >

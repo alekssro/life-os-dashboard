@@ -102,6 +102,12 @@ export function HabitTracker({
 
   const todayStr = useMemo(() => toISODate(appDayStart()), []);
 
+  // The current period anchors the "you are here" highlight in every matrix:
+  // the current day, the current week and the current month.
+  const currentWeekStart = useMemo(() => formatDateYYYYMMDD(getWeekStart(appDayStart())), []);
+  const currentWeekEnd = useMemo(() => formatDateYYYYMMDD(getWeekEnd(appDayStart())), []);
+  const currentMonthStart = useMemo(() => formatDateYYYYMMDD(getMonthStart(appDayStart())), []);
+
   // Every group keeps its own view and its own anchor date, so each frequency
   // can be browsed at its natural granularity.
   const [dailyView, setDailyView] = useState<ViewMode>('WEEK');
@@ -274,6 +280,8 @@ export function HabitTracker({
                   key={date}
                   done={isDoneOn(routine, date)}
                   isToday={date === todayStr}
+                  isCurrent={date === todayStr}
+                  inCurrentWeek={date >= currentWeekStart && date <= currentWeekEnd}
                   title={`${formatDateDDMMYYYY(date)}: ${isDoneOn(routine, date) ? 'Completed' : 'Missed'}`}
                   onClick={() => toggle(routine, date)}
                   className="w-4 h-4"
@@ -299,7 +307,14 @@ export function HabitTracker({
           </div>
           <div className="flex items-start gap-1">
             {dailyYear.weeks.map((week, wIdx) => (
-              <div key={wIdx} className="flex flex-col gap-1">
+              <div
+                key={wIdx}
+                className={`flex flex-col gap-1 rounded-md ${
+                  week[0] === currentWeekStart
+                    ? 'bg-[color-mix(in_srgb,var(--paper-accent)_10%,transparent)] p-0.5 -m-0.5 ring-1 ring-[color-mix(in_srgb,var(--paper-accent)_40%,transparent)]'
+                    : ''
+                }`}
+              >
                 {week.map((date) => (
                   <MatrixCell
                     key={date}
@@ -325,6 +340,7 @@ export function HabitTracker({
             key={date}
             done={isDoneOn(routine, date)}
             isToday={date === todayStr}
+            isCurrent={date === todayStr}
             title={`${formatDateDDMMYYYY(date)}: ${isDoneOn(routine, date) ? 'Completed' : 'Missed'} (Click to toggle)`}
             onClick={() => toggle(routine, date)}
             className="w-6 h-6"
@@ -361,6 +377,7 @@ export function HabitTracker({
                     <MatrixCell
                       key={logDate}
                       done={done}
+                      isCurrent={formatDateYYYYMMDD(weekStart) === currentWeekStart}
                       title={`Week of ${formatDateDDMMShort(weekStart)}: ${done ? 'Completed' : 'Missed'} (Click to toggle)`}
                       onClick={() => toggle(routine, logDate)}
                       className="w-4 h-4"
@@ -386,6 +403,7 @@ export function HabitTracker({
             <MatrixCell
               key={logDate}
               done={done}
+              isCurrent={formatDateYYYYMMDD(weekStart) === currentWeekStart}
               title={`Week of ${formatDateDDMMShort(weekStart)}: ${done ? 'Completed' : 'Missed'} (Click to toggle)`}
               onClick={() => toggle(routine, logDate)}
               className="w-6 h-6"
@@ -408,6 +426,7 @@ export function HabitTracker({
             <MatrixCell
               key={logDate}
               done={done}
+              isCurrent={formatDateYYYYMMDD(monthStart) === currentMonthStart}
               title={`${formatMonthYear(monthStart)}: ${done ? 'Completed' : 'Missed'} (Click to toggle)`}
               onClick={() => toggle(routine, logDate)}
               className="w-6 h-6"
@@ -751,26 +770,42 @@ function GroupHeader({
 function MatrixCell({
   done,
   isToday,
+  isCurrent,
+  inCurrentWeek,
   title,
   onClick,
   className,
+  label,
 }: {
   done: boolean;
   isToday?: boolean;
+  /** The cell represents the current day/week/month — drawn larger. */
+  isCurrent?: boolean;
+  /** The cell falls inside the current week (used for the monthly grid). */
+  inCurrentWeek?: boolean;
   title: string;
   onClick: () => void;
   className: string;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={`${className} rounded-xs transition-all border flex items-center justify-center font-mono ${
+      className={`${className} rounded-md transition-all border flex items-center justify-center font-mono ${
         done
           ? 'bg-[var(--paper-accent)] border-[var(--paper-accent)] text-white'
           : 'bg-[var(--paper-card)] border-[var(--paper-border)] hover:border-[var(--paper-border-strong)]'
-      } ${isToday ? 'ring-1 ring-[var(--paper-accent)]' : ''}`}
-    />
+      } ${inCurrentWeek && !done ? 'bg-[color-mix(in_srgb,var(--paper-accent)_10%,transparent)]' : ''} ${
+        isToday ? 'ring-1 ring-[var(--paper-accent)]' : ''
+      } ${
+        // The current period is scaled up so it reads at a glance; the scale
+        // keeps the surrounding grid from shifting.
+        isCurrent ? 'relative z-10 rounded-lg scale-[1.15] shadow-sm ring-1 ring-[var(--paper-accent)]' : ''
+      }`}
+    >
+      {label}
+    </button>
   );
 }
