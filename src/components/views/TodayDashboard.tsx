@@ -149,12 +149,12 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             onEditTask={(id) => setEditingTaskId(id)}
           />
 
-          {/* 2. Habits (Grouped morning/afternoon/evening, only due today, week/month view) */}
+          {/* 2. Habits (divided by daily/weekly/monthly, only due today, default views) */}
           <HabitTracker
             title="Habits"
             isTodayOnly={true}
             allowYearlyView={false}
-            showControls={true}
+            showControls={false}
           />
 
           {/* 3. Obsidian Markdown Quick Capture */}

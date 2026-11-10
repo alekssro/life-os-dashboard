@@ -253,6 +253,52 @@ export function daysInMonth(date: Date): number {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 }
 
+/** First day of the year containing `date` (local midnight). */
+export function getYearStart(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setMonth(0, 1);
+  return d;
+}
+
+/**
+ * Every Monday (week start) that begins inside the month containing `date`.
+ * A month therefore shows 4 or 5 week squares — one per week that starts in it.
+ */
+export function weekStartsInMonth(date: Date): Date[] {
+  const start = getMonthStart(date);
+  const count = daysInMonth(start);
+  const starts: Date[] = [];
+  for (let day = 1; day <= count; day++) {
+    const d = new Date(start);
+    d.setDate(day);
+    if (d.getDay() === 1) starts.push(d); // Monday
+  }
+  return starts;
+}
+
+/**
+ * Every Monday (week start) that begins inside each month of the given year,
+ * grouped by month: 12 entries with 4-5 weeks each.
+ */
+export function weekStartsByMonthInYear(year: number): Date[][] {
+  const months: Date[][] = [];
+  for (let month = 0; month < 12; month++) {
+    months.push(weekStartsInMonth(new Date(year, month, 1)));
+  }
+  return months;
+}
+
+/** Moves `date` by whole years, clamping 29 Feb to 28 Feb. */
+export function addYearsClamped(date: Date, years: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setFullYear(d.getFullYear() + years);
+  d.setDate(Math.min(day, daysInMonth(d)));
+  return d;
+}
+
 /**
  * Every calendar day of the month containing `date` as YYYY-MM-DD strings,
  * from the 1st through the last day of that month.

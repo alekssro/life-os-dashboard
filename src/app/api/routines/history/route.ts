@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { appDayStart, toISODate, formatDateYYYYMMDD } from '@/lib/date';
+import { appDayStart, formatDateYYYYMMDD } from '@/lib/date';
 
 /**
  * GET /api/routines/history
@@ -17,13 +17,15 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const routineId = searchParams.get('routineId');
     const today = appDayStart();
-    const todayStr = toISODate(today);
 
-    // Default to last 365 days if not specified
-    const defaultStart = new Date(today);
-    defaultStart.setDate(defaultStart.getDate() - 365);
+    // Default window: the previous, current and next calendar year. The
+    // matrices show whole months/years (and future cells), so the history has
+    // to reach beyond today.
+    const year = today.getFullYear();
+    const defaultStart = new Date(year - 1, 0, 1);
+    const defaultEnd = new Date(year + 1, 11, 31);
     const startDate = searchParams.get('startDate') || formatDateYYYYMMDD(defaultStart);
-    const endDate = searchParams.get('endDate') || todayStr;
+    const endDate = searchParams.get('endDate') || formatDateYYYYMMDD(defaultEnd);
 
     const whereClause: any = {
       date: {

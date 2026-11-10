@@ -18,16 +18,15 @@ interface DashboardState {
   routines: Routine[];
   domains: Domain[];
   habitHistory: HabitHistoryMap;
-  selectedHabitDate: string; // YYYY-MM-DD anchoring the matrix window & row checkbox
-  habitViewMode: 'WEEK' | 'MONTH' | 'YEAR';
+  // Range the loaded history covers, so refreshes keep the same window.
+  habitHistoryRange: { start: string; end: string } | null;
 
   // State Setters
   setTasks: (tasks: Task[]) => void;
   setEvents: (events: Event[]) => void;
   setRoutines: (routines: Routine[]) => void;
   setDomains: (domains: Domain[]) => void;
-  setSelectedHabitDate: (date: string) => void;
-  setHabitViewMode: (mode: 'WEEK' | 'MONTH' | 'YEAR') => void;
+  setHabitHistoryRange: (range: { start: string; end: string } | null) => void;
 
   // Actions
   fetchDashboardData: () => Promise<void>;
@@ -52,15 +51,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   routines: [],
   domains: [],
   habitHistory: {},
-  selectedHabitDate: toISODate(appDayStart()),
-  habitViewMode: 'MONTH',
+  habitHistoryRange: null,
 
   setTasks: (tasks) => set({ tasks }),
   setEvents: (events) => set({ events }),
   setRoutines: (routines) => set({ routines }),
   setDomains: (domains) => set({ domains }),
-  setSelectedHabitDate: (selectedHabitDate) => set({ selectedHabitDate }),
-  setHabitViewMode: (habitViewMode) => set({ habitViewMode }),
+  setHabitHistoryRange: (habitHistoryRange) => set({ habitHistoryRange }),
 
   fetchDashboardData: async () => {
     try {
@@ -233,7 +230,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   toggleHabitOptimistic: async (routineId: string, dateStr?: string) => {
-    const todayStr = dateStr || get().selectedHabitDate || toISODate(appDayStart());
+    const todayStr = dateStr || toISODate(appDayStart());
     const prevRoutines = get().routines;
     const prevHistory = get().habitHistory;
 
@@ -312,9 +309,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   loadHabitHistory: async (startDate?: string, endDate?: string) => {
     try {
+      // Fall back to the range the matrices are currently showing, so a
+      // refresh never drops logs from a year the user navigated to.
+      const range = get().habitHistoryRange;
+      const start = startDate ?? range?.start;
+      const end = endDate ?? range?.end;
+
       const url = new URL('/api/routines/history', window.location.origin);
-      if (startDate) url.searchParams.set('startDate', startDate);
-      if (endDate) url.searchParams.set('endDate', endDate);
+      if (start) url.searchParams.set('startDate', start);
+      if (end) url.searchParams.set('endDate', end);
 
       const res = await fetch(url.toString());
       if (!res.ok) return;

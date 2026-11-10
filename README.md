@@ -33,7 +33,13 @@ A personal operations dashboard and life management system inspired by the case-
    - **Daylight**: Crisp minimal slate & white for desktop and mobile daylight use.
    - **Midnight OLED**: Deep black for mobile night use.
 
-5. **Integrated Modules**
+5. **E-Paper Terminal Mode (`/epaper`)**
+   - Dedicated route rendering a strict 800×480, non-scrollable, pure-monochrome (`#000000` on `#FFFFFF`) glance panel for e-paper terminals and reTerminal-style kiosks — served outside the main app shell so the desktop UI is untouched.
+   - Essential items only: current focus, top priority tasks, next events, and today's habits.
+   - Physical function keys map to system actions: **F1** forces a full sync (Superlist + calendar), **F2** cycles the focus context (ALL → WORK → HOMELAB → HOME), **F3** focuses the scratchpad buffer (Enter captures it through `/api/capture`).
+   - 10-second clock, 5-minute data poll, offline-capable via the service worker.
+
+6. **Integrated Modules**
    - **Tasks**: Full task management with domain filtering, recurring schedules (`↺ WEEKLY`, `↺ MONTHLY`), and due dates.
    - **Routines**: Morning, Afternoon, and Evening anchors.
    - **Projects**: Milestone deliverables, Monthly Retainers (hours logging & monthly budget), and Ongoing Areas.
