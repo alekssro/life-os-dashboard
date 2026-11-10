@@ -279,9 +279,7 @@ export async function POST(req: NextRequest) {
           dueDate: serializeDueDate(item.dueDate),
           priority: item.priority,
         });
-        const rawContent = item.dueDate
-          ? `${item.title} (due ${item.dueDate})`
-          : item.title;
+        const rawContent = item.title;
 
         const existing = await prisma.inboxItem.findUnique({
           where: { superlistId: item.id },

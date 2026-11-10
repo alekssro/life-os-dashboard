@@ -91,11 +91,16 @@ export async function POST(req: NextRequest) {
         ? await prisma.task.findUnique({ where: { superlistId } })
         : null;
 
+      // Keep the due date the item already carried (Superlist inbox tasks
+      // arrive with one) — it must survive the triage.
+      const dueDate = meta.dueDate ? parseFlexibleDate(meta.dueDate) : null;
+
       const taskData = {
         title: inboxItem.title,
         notes: inboxItem.rawContent,
         status: 'TODO' as const,
         domainId,
+        dueDate,
         ...(superlistId ? { superlistId, superlistListId, superlistUrl, source: 'SUPERLIST' as const } : {}),
       };
 
