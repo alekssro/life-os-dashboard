@@ -1,7 +1,7 @@
 {
   "name": "Life OS",
   "short_name": "Life OS",
-  "description": "Personal Operations Dashboard — Tasks, Routines, Projects, CRM",
+  "description": "Personal Operations Dashboard — Tasks, Habits, Library, Domains",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

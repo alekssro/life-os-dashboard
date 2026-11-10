@@ -7,8 +7,6 @@ import { TopBar } from '@/components/TopBar';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TasksView } from '@/components/views/TasksView';
 import { RoutinesView } from '@/components/views/RoutinesView';
-import { ProjectsView } from '@/components/views/ProjectsView';
-import { PeopleView } from '@/components/views/PeopleView';
 import { LibraryView } from '@/components/views/LibraryView';
 import { DomainsView } from '@/components/views/DomainsView';
 import { WeeklyReviewView } from '@/components/views/WeeklyReviewView';
@@ -17,7 +15,7 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { useSuperlistSync } from '@/hooks/useSuperlistSync';
 
 export default function HomePage() {
-  const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'projects' | 'people' | 'library' | 'domains' | 'weekly-review'>('today');
+  const [currentView, setCurrentView] = useState<'today' | 'tasks' | 'routines' | 'library' | 'domains' | 'weekly-review'>('today');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -90,8 +88,6 @@ export default function HomePage() {
           )}
           {currentView === 'tasks' && <TasksView />}
           {currentView === 'routines' && <RoutinesView />}
-          {currentView === 'projects' && <ProjectsView />}
-          {currentView === 'people' && <PeopleView />}
           {currentView === 'library' && <LibraryView />}
           {currentView === 'domains' && <DomainsView />}
           {currentView === 'weekly-review' && <WeeklyReviewView />}

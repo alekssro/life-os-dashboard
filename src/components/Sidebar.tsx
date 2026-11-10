@@ -6,12 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
-  FolderKanban,
   Layers,
   Plus,
   Repeat,
   Settings,
-  Users,
   ClipboardList,
 } from 'lucide-react';
 import React from 'react';
@@ -20,8 +18,6 @@ export type NavItem =
   | 'today'
   | 'tasks'
   | 'routines'
-  | 'projects'
-  | 'people'
   | 'library'
   | 'domains'
   | 'weekly-review';
@@ -49,8 +45,6 @@ export function Sidebar({
     { id: 'today' as NavItem, label: 'Today', icon: Flame, badge: slippingCount > 0 ? slippingCount : undefined },
     { id: 'tasks' as NavItem, label: 'Tasks', icon: CheckSquare },
     { id: 'routines' as NavItem, label: 'Habits', icon: Repeat },
-    { id: 'projects' as NavItem, label: 'Projects', icon: FolderKanban },
-    { id: 'people' as NavItem, label: 'People', icon: Users },
     { id: 'library' as NavItem, label: 'Library', icon: BookOpen },
     { id: 'domains' as NavItem, label: 'Domains', icon: Layers },
     { id: 'weekly-review' as NavItem, label: 'Weekly Review', icon: ClipboardList },

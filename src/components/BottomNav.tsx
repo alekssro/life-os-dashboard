@@ -5,13 +5,11 @@ import {
   CheckSquare,
   ClipboardList,
   Flame,
-  FolderKanban,
   Layers,
   Menu,
   Plus,
   Repeat,
   Settings,
-  Users,
   X,
 } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
@@ -20,8 +18,6 @@ export type NavItem =
   | 'today'
   | 'tasks'
   | 'routines'
-  | 'projects'
-  | 'people'
   | 'library'
   | 'domains'
   | 'weekly-review';
@@ -41,8 +37,6 @@ const mainNavItems: { id: NavItem; label: string; icon: React.ComponentType<{ cl
 ];
 
 const moreNavItems: { id: NavItem; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'projects', label: 'Projects', icon: FolderKanban },
-  { id: 'people', label: 'People', icon: Users },
   { id: 'library', label: 'Library', icon: BookOpen },
   { id: 'domains', label: 'Domains', icon: Layers },
   { id: 'weekly-review', label: 'Weekly Review', icon: ClipboardList },
