@@ -54,6 +54,11 @@ async function fetchWithCacheFirst(request) {
   }
 }
 
+/**
+ * API reads are network-first: the dashboard must never render a stale
+ * snapshot (an emptied section coming back, a triaged item re-appearing).
+ * The cached copy is only the offline fallback.
+ */
 async function fetchWithNetworkFirst(request) {
   try {
     const response = await fetch(request);
@@ -72,19 +77,23 @@ async function fetchWithNetworkFirst(request) {
   }
 }
 
-async function fetchWithStaleWhileRevalidate(request) {
-  const cached = await caches.match(request);
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        const cache = caches.open(API_CACHE_NAME);
-        cache.then((c) => c.put(request, response.clone()));
-      }
-      return response;
-    })
-    .catch(() => cached);
-
-  return cached || fetchPromise;
+/**
+ * Drops the cached snapshots of the endpoint a mutation just changed, so the
+ * next read cannot serve data that the mutation invalidated.
+ */
+async function invalidateApiCache(request) {
+  const { pathname } = new URL(request.url);
+  const base = pathname.replace(/\/$/, '');
+  const cache = await caches.open(API_CACHE_NAME);
+  const keys = await cache.keys();
+  await Promise.all(
+    keys
+      .filter((key) => {
+        const p = new URL(key.url).pathname.replace(/\/$/, '');
+        return p === base || p.startsWith(base + '/');
+      })
+      .map((key) => cache.delete(key))
+  );
 }
 
 function isApiRequest(url) {
@@ -102,7 +111,7 @@ async function handleRequest(request) {
     if (isMutationRequest(request)) {
       return handleMutation(request);
     }
-    return fetchWithStaleWhileRevalidate(request);
+    return fetchWithNetworkFirst(request);
   }
 
   // Any other /api/* endpoint (notifications, calendar, capture…) must always
@@ -139,6 +148,9 @@ async function handleRequest(request) {
 async function handleMutation(request) {
   try {
     const response = await fetch(request);
+    // A mutation changes what the GET endpoints return, so their cached
+    // snapshots must not outlive it.
+    if (response.ok) await invalidateApiCache(request);
     return response;
   } catch {
     await queueOfflineMutation(request);
@@ -225,6 +237,8 @@ async function syncMutations() {
       });
       if (response.ok) {
         await store.delete(mutation.id);
+        // The replayed mutation changes the endpoint's data too.
+        await invalidateApiCache(new Request(mutation.url));
       }
     } catch {
       // Keep in queue for next sync

@@ -331,13 +331,13 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
           {/* 2. Calendar (Google Calendar feeds filtered by active focus mode) */}
           <CalendarView />
 
-          {/* 3. Resurfacing (Boxed + icon styling) */}
-          <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-[var(--paper-border)] pb-2.5">
-              <BookOpen className="w-4 h-4 text-[var(--paper-accent)]" />
-              <h2 className="font-bold text-sm text-[var(--paper-text)]">Resurfacing</h2>
-            </div>
-            {resurfacedItem ? (
+          {/* 3. Resurfacing — hidden entirely when there is nothing to resurface */}
+          {resurfacedItem && (
+            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-2.5">
+              <div className="flex items-center gap-2 border-b border-[var(--paper-border)] pb-2.5">
+                <BookOpen className="w-4 h-4 text-[var(--paper-accent)]" />
+                <h2 className="font-bold text-sm text-[var(--paper-text)]">Resurfacing</h2>
+              </div>
               <div className="p-3 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-1.5">
                 <p className="text-xs font-serif italic text-[var(--paper-text)] leading-relaxed">
                   "{resurfacedItem.body || resurfacedItem.title}"
@@ -348,95 +348,85 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
                   </p>
                 )}
               </div>
-            ) : (
-              <p className="text-xs text-[var(--paper-muted)] font-serif italic">
-                One saved quote, verse, or journal reflection rotates here daily.
-              </p>
-            )}
-          </div>
-
-          {/* 4. Needs Review (Boxed + icon styling) */}
-          <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <Inbox className="w-4 h-4 text-[var(--paper-accent)]" />
-                <h2 className="font-bold text-sm text-[var(--paper-text)]">Needs Review</h2>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-card-subtle)] text-[var(--paper-muted)]">
-                  {inboxItems.length}
-                </span>
-              </div>
             </div>
+          )}
 
-            <div className="space-y-2">
-              {inboxItems.slice(0, 3).map((item) => (
-                <div
-                  key={item.id}
-                  className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2"
-                >
-                  <p className="text-xs font-semibold text-[var(--paper-text)]">{item.title}</p>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <button
-                      onClick={() => handleTriageAction(item.id, 'OWN')}
-                      className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
-                    >
-                      Own
-                    </button>
-                    <button
-                      onClick={() => handleTriageAction(item.id, 'READING')}
-                      className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
-                    >
-                      Reading
-                    </button>
-                    <button
-                      onClick={() => handleTriageAction(item.id, 'CLEAR')}
-                      className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-muted)]"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {inboxItems.length === 0 && (
-                <p className="text-xs text-[var(--paper-muted)] italic font-serif">
-                  Inbox zero! All captured thoughts have been reviewed.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* 5. Notifications (Boxed + icon styling) */}
-          <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-[var(--paper-accent)]" />
-                <h2 className="font-bold text-sm text-[var(--paper-text)]">Notifications</h2>
-              </div>
-              <span className="text-[10px] font-mono text-[var(--paper-muted)]">
-                {notifications.filter((n) => !n.read).length} unread
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {notifications.slice(0, 3).map((notif) => (
-                <div
-                  key={notif.id}
-                  className="p-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-xs flex items-center justify-between gap-2"
-                >
-                  <span className="font-medium text-[var(--paper-text)] truncate">{notif.title}</span>
-                  <span className="text-[10px] font-mono text-[var(--paper-muted)] shrink-0">
-                    {formatTimeHHMM(notif.createdAt)}
+          {/* 4. Needs Review — hidden entirely when the inbox is clear */}
+          {inboxItems.length > 0 && (
+            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-[var(--paper-accent)]" />
+                  <h2 className="font-bold text-sm text-[var(--paper-text)]">Needs Review</h2>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--paper-card-subtle)] text-[var(--paper-muted)]">
+                    {inboxItems.length}
                   </span>
                 </div>
-              ))}
+              </div>
 
-              {notifications.length === 0 && (
-                <p className="text-xs text-[var(--paper-muted)] italic font-serif">
-                  No new system alerts or reminders.
-                </p>
-              )}
+              <div className="space-y-2">
+                {inboxItems.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] space-y-2"
+                  >
+                    <p className="text-xs font-semibold text-[var(--paper-text)]">{item.title}</p>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        onClick={() => handleTriageAction(item.id, 'OWN')}
+                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
+                      >
+                        Own
+                      </button>
+                      <button
+                        onClick={() => handleTriageAction(item.id, 'READING')}
+                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-text)]"
+                      >
+                        Reading
+                      </button>
+                      <button
+                        onClick={() => handleTriageAction(item.id, 'CLEAR')}
+                        className="px-2 py-0.5 text-[10px] font-mono uppercase rounded border border-[var(--paper-border-strong)] hover:border-[var(--paper-accent)] text-[var(--paper-muted)]"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 5. Notifications — hidden entirely when there is nothing new */}
+          {notifications.length > 0 && (
+            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-[var(--paper-accent)]" />
+                  <h2 className="font-bold text-sm text-[var(--paper-text)]">Notifications</h2>
+                </div>
+                <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                  {notifications.filter((n) => !n.read).length} unread
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                {notifications.slice(0, 3).map((notif) => (
+                  <div
+                    key={notif.id}
+                    className="p-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-xs flex items-center justify-between gap-2"
+                  >
+                    <span className="font-medium text-[var(--paper-text)] truncate">{notif.title}</span>
+                    <span className="text-[10px] font-mono text-[var(--paper-muted)] shrink-0">
+                      {formatTimeHHMM(notif.createdAt)}
+                    </span>
+                  </div>
+                ))}
+
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
