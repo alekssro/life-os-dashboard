@@ -14,6 +14,12 @@ interface CalendarDateInputProps {
   disabled?: boolean;
   /** Where the popup calendar anchors when the input sits near the right edge of the screen. */
   popupAlign?: 'left' | 'right';
+  /** Render a compact icon trigger instead of the text input (same calendar popup). */
+  iconOnly?: boolean;
+  /** Icon rendered inside the compact trigger. */
+  icon?: React.ReactNode;
+  /** Tooltip for the compact trigger. */
+  title?: string;
 }
 
 const MONTHS = [
@@ -57,6 +63,9 @@ export function CalendarDateInput({
   autoFocus,
   disabled,
   popupAlign = 'left',
+  iconOnly = false,
+  icon,
+  title,
 }: CalendarDateInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -175,32 +184,12 @@ export function CalendarDateInput({
   );
   const today = realTodayISO();
 
-  return (
-    <div className="relative" ref={calendarRef}>
-      <input
-        ref={inputRef}
-        id={id}
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        autoFocus={autoFocus}
-        disabled={disabled}
-        value={text}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onFocus={handleFocus}
-        placeholder={placeholder}
-        aria-label="Date (dd/mm/yyyy)"
-        title="Format: dd/mm/yyyy"
-        style={invalid ? { borderColor: '#dc2626' } : undefined}
-        className={className}
-      />
-
-      {showCalendar && !disabled && (
-        <div
-          className="absolute z-50 mt-1 w-64 bg-[var(--paper-card)] border border-[var(--paper-border)] rounded-lg shadow-lg p-3 animate-in fade-in-0 zoom-in-95 duration-150"
-          style={popupAlign === 'right' ? { right: 0 } : { left: 0 }}
-        >
+  const calendarPopup =
+    showCalendar && !disabled ? (
+      <div
+        className="absolute z-50 mt-1 w-64 bg-[var(--paper-card)] border border-[var(--paper-border)] rounded-lg shadow-lg p-3 animate-in fade-in-0 zoom-in-95 duration-150"
+        style={popupAlign === 'right' ? { right: 0 } : { left: 0 }}
+      >
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"
@@ -282,7 +271,48 @@ export function CalendarDateInput({
             Today
           </button>
         </div>
-      )}
+    ) : null;
+
+  // Compact trigger: an icon button that opens the very same calendar.
+  if (iconOnly) {
+    return (
+      <div className="relative" ref={calendarRef}>
+        <button
+          type="button"
+          onClick={() => setShowCalendar((prev) => !prev)}
+          className={className}
+          title={title || 'Pick a date'}
+          aria-label={title || 'Pick a date'}
+        >
+          {icon}
+        </button>
+        {calendarPopup}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" ref={calendarRef}>
+      <input
+        ref={inputRef}
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        autoFocus={autoFocus}
+        disabled={disabled}
+        value={text}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onFocus={handleFocus}
+        placeholder={placeholder}
+        aria-label="Date (dd/mm/yyyy)"
+        title="Format: dd/mm/yyyy"
+        style={invalid ? { borderColor: '#dc2626' } : undefined}
+        className={className}
+      />
+
+      {calendarPopup}
     </div>
   );
 }

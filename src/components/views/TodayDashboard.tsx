@@ -4,6 +4,8 @@ import {
   AlertCircle,
   ArrowRight,
   Bell,
+  Calendar,
+  CalendarPlus,
   Check,
   CheckSquare,
   Clock,
@@ -20,7 +22,16 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { NavItem } from '../Sidebar';
-import { appDayStart, formatDateDDMMYYYY, formatTimeHHMM, formatWeekday, toISODate } from '@/lib/date';
+import {
+  appDayStart,
+  formatDateDDMMYYYY,
+  formatDateYYYYMMDD,
+  formatTimeHHMM,
+  formatWeekday,
+  toISODate,
+  todayISO,
+} from '@/lib/date';
+import { CalendarDateInput } from '@/components/CalendarDateInput';
 import { TaskHub } from '@/components/TaskHub';
 import { CalendarView } from '@/components/CalendarView';
 import { HabitTracker } from '@/components/HabitTracker';
@@ -41,6 +52,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
+  const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
   const tasks = useDashboardStore((s) => s.tasks);
   const domains = useDashboardStore((s) => s.domains);
 
@@ -87,6 +99,44 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
     fetchDashboardData();
     loadSecondaryData();
   };
+
+  // Star an attention task so it joins the Top Priorities of the task hub.
+  const starAttentionTask = async (task: any) => {
+    await toggleTaskStarOptimistic(task.id);
+    loadSecondaryData();
+  };
+
+  // Re-plan an overdue task for any date the user picks (today is just one option).
+  const scheduleTaskOn = async (task: any, isoDate: string) => {
+    await fetch('/api/tasks', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: task.id, dueDate: isoDate }),
+    });
+    fetchDashboardData();
+    loadSecondaryData();
+  };
+
+  // Re-plan an overdue task for today instead of leaving it in the past.
+  const scheduleTaskToday = async (task: any) => {
+    await scheduleTaskOn(task, todayISO());
+  };
+
+  const isTaskStarred = (taskId: string) => !!tasks.find((t) => t.id === taskId)?.isTop3;
+
+  // The task's current due date as YYYY-MM-DD (used to highlight it in the picker).
+  const dueDateISO = (task: any): string => {
+    if (!task.dueDate) return '';
+    const d = new Date(task.dueDate);
+    if (isNaN(d.getTime())) return '';
+    return formatDateYYYYMMDD(d);
+  };
+
+  // The Attention panel only shows up when there is something to act on.
+  const hasAttention =
+    (attention?.overdueTasks?.length ?? 0) > 0 ||
+    (attention?.atRiskProjects?.length ?? 0) > 0 ||
+    (attention?.quietProjects?.length ?? 0) > 0;
 
   const saveTask = async (id: string, updates: any) => {
     setEditingTaskId(null);
@@ -174,78 +224,112 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
         {/* RIGHT RAIL COLUMN (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* 1. Calendar (Google Calendar feeds filtered by active focus mode) */}
-          <CalendarView />
-
-          {/* 2. Attention (Boxed + icon styling) */}
-          <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-                <h2 className="font-bold text-sm text-[var(--paper-text)]">Attention</h2>
+          {/* 1. Attention (Boxed + icon styling) — only shown when something needs it */}
+          {hasAttention && (
+            <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-[var(--paper-border)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <h2 className="font-bold text-sm text-[var(--paper-text)]">Attention</h2>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-3">
-              {/* Overdue tasks */}
-              {(attention?.overdueTasks?.length > 0 || attention?.atRiskProjects?.length > 0) && (
-                <div className="space-y-2">
-                  <div className="text-[10px] font-mono uppercase text-red-500 font-bold tracking-wider">
-                    At Risk
-                  </div>
-                  {(attention?.overdueTasks ?? []).map((t: any) => (
-                    <div
-                      key={t.id}
-                      className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/5 flex items-start gap-2.5"
-                    >
-                      <button
-                        onClick={() => completeOverdueTask(t)}
-                        className="mt-0.5 text-[var(--paper-muted)] hover:text-red-500"
+              <div className="space-y-3">
+                {/* Overdue tasks */}
+                {(attention?.overdueTasks?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-mono uppercase text-red-500 font-bold tracking-wider">
+                      Overdue Tasks
+                    </div>
+                    {(attention?.overdueTasks ?? []).map((t: any) => (
+                      <div
+                        key={t.id}
+                        className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/5 flex items-start gap-2.5"
                       >
-                        <Square className="w-4 h-4" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-[var(--paper-text)] truncate">
-                          {t.title}
-                        </p>
-                        <span className="text-[10px] font-mono text-red-500 uppercase font-medium">
-                          {formatDateDDMMYYYY(t.dueDate)} · {t.daysOverdue}d overdue
+                        <button
+                          onClick={() => completeOverdueTask(t)}
+                          className="mt-0.5 text-[var(--paper-muted)] hover:text-red-500 transition"
+                          title="Mark as done"
+                        >
+                          <Square className="w-4 h-4" />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-[var(--paper-text)] truncate">
+                            {t.title}
+                          </p>
+                          <span className="text-[10px] font-mono text-red-500 uppercase font-medium">
+                            {formatDateDDMMYYYY(t.dueDate)} · {t.daysOverdue}d overdue
+                          </span>
+                        </div>
+
+                        {/* Quick actions */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={() => starAttentionTask(t)}
+                            className={`p-1 rounded transition active:scale-90 ${
+                              isTaskStarred(t.id)
+                                ? 'text-[var(--paper-star)]'
+                                : 'text-[var(--paper-muted)] hover:text-[var(--paper-star)]'
+                            }`}
+                            title={
+                              isTaskStarred(t.id)
+                                ? 'Remove star (Top 3 Focus)'
+                                : 'Star as Top 3 Focus'
+                            }
+                          >
+                            <Star
+                              className={`w-3.5 h-3.5 ${
+                                isTaskStarred(t.id) ? 'fill-current' : ''
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => scheduleTaskToday(t)}
+                            className="p-1 rounded text-[var(--paper-muted)] hover:text-[var(--paper-accent)] transition active:scale-90"
+                            title="Schedule for today"
+                          >
+                            <CalendarPlus className="w-3.5 h-3.5" />
+                          </button>
+                          <CalendarDateInput
+                            iconOnly
+                            icon={<Calendar className="w-3.5 h-3.5" />}
+                            title="Schedule for another date"
+                            value={dueDateISO(t)}
+                            onChange={(iso) => scheduleTaskOn(t, iso)}
+                            popupAlign="right"
+                            className="p-1 rounded text-[var(--paper-muted)] hover:text-[var(--paper-accent)] transition active:scale-90"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quiet Projects */}
+                {(attention?.quietProjects?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-mono uppercase text-[var(--paper-muted)] font-bold tracking-wider">
+                      Quiet Projects
+                    </div>
+                    {attention.quietProjects.map((p: any) => (
+                      <div
+                        key={p.id}
+                        className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] flex items-center justify-between text-xs"
+                      >
+                        <span className="font-semibold text-[var(--paper-text)] truncate">{p.title}</span>
+                        <span className="text-[10px] font-mono text-[var(--paper-muted)]">
+                          {p.daysInactive}d inactive
                         </span>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Quiet Projects */}
-              {attention?.quietProjects?.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-[10px] font-mono uppercase text-[var(--paper-muted)] font-bold tracking-wider">
-                    Quiet Projects
+                    ))}
                   </div>
-                  {attention.quietProjects.map((p: any) => (
-                    <div
-                      key={p.id}
-                      className="p-2.5 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] flex items-center justify-between text-xs"
-                    >
-                      <span className="font-semibold text-[var(--paper-text)] truncate">{p.title}</span>
-                      <span className="text-[10px] font-mono text-[var(--paper-muted)]">
-                        {p.daysInactive}d inactive
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!attention?.overdueTasks?.length &&
-                !attention?.atRiskProjects?.length &&
-                !attention?.quietProjects?.length && (
-                  <p className="text-xs text-[var(--paper-muted)] italic font-serif">
-                    Nothing needs immediate attention. All projects and tasks are on track.
-                  </p>
                 )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 2. Calendar (Google Calendar feeds filtered by active focus mode) */}
+          <CalendarView />
 
           {/* 3. Resurfacing (Boxed + icon styling) */}
           <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-2.5">
