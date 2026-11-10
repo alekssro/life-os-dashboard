@@ -24,6 +24,8 @@ interface TaskHubProps {
   onEditTask?: (taskId: string) => void;
   title?: string;
   showFocusBadge?: boolean;
+  /** When true the "Other Tasks" section starts collapsed (home/dashboard view). */
+  defaultCollapsed?: boolean;
 }
 
 /** A task is actionable while it is neither done nor cancelled. */
@@ -64,6 +66,7 @@ export function TaskHub({
   onEditTask,
   title = 'Task Hub',
   showFocusBadge = true,
+  defaultCollapsed = false,
 }: TaskHubProps) {
   const tasks = useDashboardStore((s) => s.tasks);
   const focusMode = useDashboardStore((s) => s.focusMode);
@@ -72,7 +75,7 @@ export function TaskHub({
   const clearCompletedTasks = useDashboardStore((s) => s.clearCompletedTasks);
 
   const [isTodayCollapsed, setIsTodayCollapsed] = useState(false);
-  const [isOtherCollapsed, setIsOtherCollapsed] = useState(false);
+  const [isOtherCollapsed, setIsOtherCollapsed] = useState(defaultCollapsed);
   const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
   const [clearError, setClearError] = useState<string | null>(null);

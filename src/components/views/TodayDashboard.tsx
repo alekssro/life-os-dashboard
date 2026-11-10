@@ -142,11 +142,13 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT / CENTER COLUMN (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* 1. Task Hub (Focus mode enabled, toggleable other tasks, top priorities) */}
+          {/* 1. Task Hub (Focus mode enabled, top priorities + today/overdue up
+              front, "Other Tasks" collapsed so the dashboard stays focused) */}
           <TaskHub
             title="Task Hub"
             onOpenCapture={onOpenCapture}
             onEditTask={(id) => setEditingTaskId(id)}
+            defaultCollapsed
           />
 
           {/* 2. Habits (divided by daily/weekly/monthly, only due today, default views) */}
