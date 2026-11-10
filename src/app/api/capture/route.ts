@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
           data: {
             name: cleanText,
             slug: cleanText.toLowerCase().replace(/\s+/g, '-'),
+            description: extraDetails.description || null,
             color: extraDetails.color || '#B84A39',
           },
         });
@@ -190,6 +191,39 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true, type: 'DOMAIN', item: domain });
+      }
+
+      // F. EVENT (calendar entry)
+      if (targetType === 'EVENT') {
+        const eventDate = extraDetails.eventDate
+          ? parseFlexibleDate(extraDetails.eventDate)
+          : new Date();
+        if (extraDetails.eventDate && !eventDate) {
+          return NextResponse.json({ error: 'Invalid date. Use dd/mm/yyyy.' }, { status: 400 });
+        }
+
+        const event = await prisma.scheduleEvent.create({
+          data: {
+            title: cleanText,
+            notes: extraDetails.notes || null,
+            date: eventDate ?? new Date(),
+            startTime: extraDetails.startTime || null,
+            endTime: extraDetails.endTime || null,
+            location: extraDetails.location || null,
+            domainId: extraDetails.domainId || null,
+            source: 'MANUAL',
+          },
+        });
+
+        await prisma.systemNotification.create({
+          data: {
+            title: 'Event scheduled',
+            message: `${event.title}${event.startTime ? ` (${event.startTime})` : ''}`,
+            type: 'INFO',
+          },
+        });
+
+        return NextResponse.json({ success: true, type: 'EVENT', item: event });
       }
 
       // F. TASK (Direct without AI)

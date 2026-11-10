@@ -6,13 +6,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  Globe,
+  Home,
   Layers,
   Plus,
+  RefreshCw,
   Repeat,
+  Server,
   Settings,
   ClipboardList,
+  Zap,
 } from 'lucide-react';
 import React from 'react';
+import { useDashboardStore } from '@/store/useDashboardStore';
+import { FocusMode } from '@/types';
+import { formatDateDDMMYYYY, formatTimeHHMM } from '@/lib/date';
 
 export type NavItem =
   | 'today'
@@ -49,6 +57,26 @@ export function Sidebar({
     { id: 'domains' as NavItem, label: 'Domains', icon: Layers },
     { id: 'weekly-review' as NavItem, label: 'Weekly Review', icon: ClipboardList },
   ];
+
+  // Focus context + sync status (moved here from the top bar).
+  const focusMode = useDashboardStore((s) => s.focusMode);
+  const setFocusMode = useDashboardStore((s) => s.setFocusMode);
+  const syncNow = useDashboardStore((s) => s.syncNow);
+  const isSyncing = useDashboardStore((s) => s.isSyncing);
+  const lastSyncedAt = useDashboardStore((s) => s.lastSyncedAt);
+
+  const focusOptions: { mode: FocusMode; label: string; icon: React.ElementType }[] = [
+    { mode: 'ALL', label: 'All focus', icon: Globe },
+    { mode: 'DEEP_WORK', label: 'Deep Work', icon: Zap },
+    { mode: 'HOMELAB', label: 'Homelab / DevOps', icon: Server },
+    { mode: 'PERSONAL', label: 'Personal / Family', icon: Home },
+  ];
+
+  const syncLabel = isSyncing
+    ? 'Syncing…'
+    : lastSyncedAt
+      ? `Synced ${formatDateDDMMYYYY(lastSyncedAt)} ${formatTimeHHMM(lastSyncedAt)}`
+      : 'Not synced yet';
 
   return (
     <div className="flex flex-col justify-between h-full">
@@ -118,8 +146,48 @@ export function Sidebar({
         </nav>
       </div>
 
-      {/* Footer: Settings */}
+      {/* Footer: focus context, sync status & settings */}
       <div className="pt-4 border-t border-[var(--paper-border)] space-y-2">
+        {/* Focus context switcher — icons only */}
+        <div className="flex items-center gap-1 px-1">
+          {focusOptions.map(({ mode, label, icon: Icon }) => {
+            const isActive = focusMode === mode;
+            return (
+              <button
+                key={mode}
+                onClick={() => setFocusMode(mode)}
+                title={label}
+                aria-label={label}
+                aria-pressed={isActive}
+                className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-full transition-all border ${
+                  isActive
+                    ? 'bg-[var(--paper-accent)] text-white border-[var(--paper-accent)]'
+                    : 'bg-[var(--paper-card-subtle)] text-[var(--paper-muted)] border-[var(--paper-border)] hover:text-[var(--paper-text)] hover:border-[var(--paper-border-strong)]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sync status + manual sync */}
+        <button
+          onClick={() => syncNow()}
+          disabled={isSyncing}
+          title="Sync Superlist & Google Calendar"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] hover:bg-[var(--paper-card-subtle)] transition disabled:opacity-60"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin text-[var(--paper-accent)]' : ''}`}
+          />
+          {!isCollapsed && (
+            <span className="flex-1 text-left font-mono text-[10px] uppercase tracking-wider truncate">
+              {syncLabel}
+            </span>
+          )}
+        </button>
+
         {/* Settings button */}
         <button
           onClick={onOpenSettings}

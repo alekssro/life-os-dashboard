@@ -5,14 +5,22 @@ import {
   CheckSquare,
   ClipboardList,
   Flame,
+  Globe,
+  Home,
   Layers,
   Menu,
   Plus,
+  RefreshCw,
   Repeat,
+  Server,
   Settings,
   X,
+  Zap,
 } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
+import { useDashboardStore } from '@/store/useDashboardStore';
+import { FocusMode } from '@/types';
+import { formatDateDDMMYYYY, formatTimeHHMM } from '@/lib/date';
 
 export type NavItem =
   | 'today'
@@ -51,6 +59,26 @@ export function BottomNav({
 }: BottomNavProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  // Focus context + sync status (the mobile home for the retired top bar).
+  const focusMode = useDashboardStore((s) => s.focusMode);
+  const setFocusMode = useDashboardStore((s) => s.setFocusMode);
+  const syncNow = useDashboardStore((s) => s.syncNow);
+  const isSyncing = useDashboardStore((s) => s.isSyncing);
+  const lastSyncedAt = useDashboardStore((s) => s.lastSyncedAt);
+
+  const focusOptions: { mode: FocusMode; label: string; icon: React.ElementType }[] = [
+    { mode: 'ALL', label: 'All focus', icon: Globe },
+    { mode: 'DEEP_WORK', label: 'Deep Work', icon: Zap },
+    { mode: 'HOMELAB', label: 'Homelab / DevOps', icon: Server },
+    { mode: 'PERSONAL', label: 'Personal / Family', icon: Home },
+  ];
+
+  const syncLabel = isSyncing
+    ? 'Syncing…'
+    : lastSyncedAt
+      ? `Synced ${formatDateDDMMYYYY(lastSyncedAt)} ${formatTimeHHMM(lastSyncedAt)}`
+      : 'Not synced yet';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -144,6 +172,52 @@ export function BottomNav({
                     })}
                   </div>
                 </div>
+
+                <div className="border-t border-[var(--paper-border)] mx-2" />
+
+                {/* Focus context */}
+                <div className="p-2">
+                  <p className="text-[10px] font-mono uppercase text-[var(--paper-muted)] px-2 py-1">
+                    Focus
+                  </p>
+                  <div className="flex items-center gap-1.5 px-2 pb-1">
+                    {focusOptions.map(({ mode, label, icon: Icon }) => {
+                      const isActive = focusMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          onClick={() => setFocusMode(mode)}
+                          title={label}
+                          aria-label={label}
+                          aria-pressed={isActive}
+                          className={`flex items-center justify-center w-9 h-9 rounded-full transition-all border ${
+                            isActive
+                              ? 'bg-[var(--paper-accent)] text-white border-[var(--paper-accent)]'
+                              : 'bg-[var(--paper-card-subtle)] text-[var(--paper-muted)] border-[var(--paper-border)]'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-[var(--paper-border)] mx-2" />
+
+                {/* Sync status + manual sync */}
+                <button
+                  onClick={() => syncNow()}
+                  disabled={isSyncing}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-[var(--paper-muted)] hover:text-[var(--paper-text)] hover:bg-[var(--paper-card-subtle)] transition-colors disabled:opacity-60"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 shrink-0 ${isSyncing ? 'animate-spin text-[var(--paper-accent)]' : ''}`}
+                  />
+                  <span className="flex-1 text-left font-mono text-[11px] uppercase tracking-wider">
+                    {syncLabel}
+                  </span>
+                </button>
 
                 <div className="border-t border-[var(--paper-border)] mx-2" />
 

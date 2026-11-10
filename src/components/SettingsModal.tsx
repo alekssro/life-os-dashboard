@@ -819,7 +819,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             Quick Capture functions with <strong>100% reliability even without AI keys</strong>:
           </p>
           <ul className="text-xs text-[var(--paper-muted)] space-y-1 font-mono pl-4 list-disc">
-            <li><strong>Zero-AI Explicit Mode</strong>: Select Task, Routine, Project, Person, Quote, or Domain in Capture modal.</li>
+            <li><strong>Zero-AI Explicit Mode</strong>: Select Task, Habit, Event, Quote, or Domain in Capture modal.</li>
             <li><strong>Deterministic Regex Parser</strong>: Runs locally if cloud AI is unreachable.</li>
             <li><strong>Optional Local Ollama</strong>: <code className="bg-[var(--paper-card-subtle)] px-1 rounded">OLLAMA_BASE_URL</code> (100% open source).</li>
             <li><strong>Cloud LLMs</strong>: Claude, Gemini, OpenAI Whisper supported via environment variables.</li>

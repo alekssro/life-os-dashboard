@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Flame,
-  Plus,
-} from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { HabitTracker } from '@/components/HabitTracker';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { EditRoutineModal } from '@/components/EditRoutineModal';
@@ -14,41 +11,6 @@ export function RoutinesView() {
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newTitle, setNewTitle] = useState('');
-  const [newTimeOfDay, setNewTimeOfDay] = useState<'MORNING' | 'AFTERNOON' | 'EVENING'>('MORNING');
-  const [newIcon, setNewIcon] = useState('✨');
-  const [newFrequency, setNewFrequency] = useState('DAILY');
-  const [newSelectedDays, setNewSelectedDays] = useState<number[]>([]);
-  const [newDayOfMonth, setNewDayOfMonth] = useState('1');
-  const [newGraceDays, setNewGraceDays] = useState(1);
-  const [newTargetPerWeek, setNewTargetPerWeek] = useState(7);
-
-  const handleCreateRoutine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-
-    await fetch('/api/routines', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newTitle.trim(),
-        timeOfDay: newTimeOfDay,
-        icon: newIcon.trim() || '✨',
-        frequency: newFrequency,
-        daysOfWeek: newFrequency === 'WEEKLY' ? JSON.stringify(newSelectedDays) : undefined,
-        dayOfMonth: newFrequency === 'MONTHLY' ? newDayOfMonth : undefined,
-        graceDays: newGraceDays,
-        targetPerWeek: newTargetPerWeek,
-      }),
-    });
-
-    setNewTitle('');
-    setNewFrequency('DAILY');
-    setNewSelectedDays([]);
-    setNewGraceDays(1);
-    setNewTargetPerWeek(7);
-    fetchDashboardData();
-  };
 
   const handleSaveEdit = async (id: string, updates: any) => {
     await fetch('/api/routines', {
@@ -73,20 +35,6 @@ export function RoutinesView() {
             Track daily, weekly and monthly streaks across GitHub-style heatmap matrices
           </p>
         </div>
-
-        <button
-          onClick={() => {
-            const formElem = document.getElementById('new-habit-input');
-            if (formElem) {
-              formElem.focus();
-              formElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--paper-accent)] text-white text-xs font-semibold hover:opacity-90 transition shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Habit</span>
-        </button>
       </div>
 
       {/* Main Habit Tracker with full Yearly multi-line GitHub commit grid enabled */}
@@ -97,52 +45,6 @@ export function RoutinesView() {
         showControls={true}
         onEditHabit={(id) => setEditingId(id)}
       />
-
-      {/* Quick Add Habit Form */}
-      <div className="bg-[var(--paper-card)] border border-[var(--paper-border-strong)] rounded-xl p-4 shadow-sm space-y-3">
-        <h3 className="font-bold text-sm text-[var(--paper-text)] flex items-center gap-1.5">
-          <Plus className="w-4 h-4 text-[var(--paper-accent)]" />
-          Create New Habit
-        </h3>
-
-        <form onSubmit={handleCreateRoutine} className="space-y-3 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-            <input
-              id="new-habit-input"
-              type="text"
-              placeholder="Habit title (e.g. Read 20 pages, Gym, Meditate)..."
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="sm:col-span-6 px-3 py-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-[var(--paper-text)] outline-none focus:border-[var(--paper-accent)]"
-            />
-            <input
-              type="text"
-              placeholder="Icon (e.g. 📚)"
-              value={newIcon}
-              onChange={(e) => setNewIcon(e.target.value)}
-              className="sm:col-span-2 px-3 py-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-[var(--paper-text)] outline-none focus:border-[var(--paper-accent)] text-center"
-            />
-            <select
-              value={newTimeOfDay}
-              onChange={(e: any) => setNewTimeOfDay(e.target.value)}
-              className="sm:col-span-4 px-3 py-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card-subtle)] text-[var(--paper-text)] outline-none focus:border-[var(--paper-accent)]"
-            >
-              <option value="MORNING">Morning</option>
-              <option value="AFTERNOON">Afternoon</option>
-              <option value="EVENING">Evening</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!newTitle.trim()}
-            className="px-4 py-2 rounded-lg bg-[var(--paper-accent)] text-white font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Habit
-          </button>
-        </form>
-      </div>
 
       {/* Pop-up Routine Edit Modal */}
       <EditRoutineModal

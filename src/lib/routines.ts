@@ -5,6 +5,23 @@ export interface RoutineSchedule {
 }
 
 /**
+ * Weekday picker options, Monday first.
+ *
+ * The `value` stays aligned with JavaScript's `Date.getDay()` (0 = Sunday …
+ * 6 = Saturday), which is what `daysOfWeek` stores — only the display order
+ * is Monday-first, matching the week everywhere else in the app.
+ */
+export const DAYS_OF_WEEK = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+];
+
+/**
  * Is this routine scheduled to run today?
  * DAILY → always, WEEKLY → matches one of daysOfWeek (0=Sun … 6=Sat),
  * MONTHLY → matches dayOfMonth (0 = last day of month). Anything unknown is

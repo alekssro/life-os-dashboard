@@ -6,7 +6,6 @@ import {
   Square,
   Star,
   ExternalLink,
-  Plus,
   Filter,
   ChevronDown,
   ChevronRight,
@@ -20,7 +19,6 @@ import { resolveSuperlistUrl } from '@/lib/superlist';
 import { appDayEnd, appDayStart, formatDateDDMMShort, parseISODateLocal } from '@/lib/date';
 
 interface TaskHubProps {
-  onOpenCapture?: () => void;
   onEditTask?: (taskId: string) => void;
   title?: string;
   showFocusBadge?: boolean;
@@ -64,7 +62,6 @@ function isDueTodayOrOverdue(task: Task, dayEnd: Date): boolean {
 }
 
 export function TaskHub({
-  onOpenCapture,
   onEditTask,
   title = 'Task Hub',
   showFocusBadge = true,
@@ -157,16 +154,6 @@ export function TaskHub({
             </span>
           )}
         </div>
-
-        {onOpenCapture && (
-          <button
-            onClick={onOpenCapture}
-            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-[var(--paper-card-subtle)] text-[var(--paper-text)] border border-[var(--paper-border)] hover:border-[var(--paper-accent)] transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Task
-          </button>
-        )}
       </div>
 
       {/* 1. Top Priorities (Never Collapsed) */}

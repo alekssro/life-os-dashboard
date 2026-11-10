@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { appDayStart, parseFlexibleDate } from '@/lib/date';
+import { appDayStart, parseFlexibleDate, serializeDueDate } from '@/lib/date';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
       calendar: true,
     },
   });
-  return NextResponse.json(events);
+
+  // An event's date is a calendar day, so it travels as YYYY-MM-DD and never
+  // shifts with the browser's timezone.
+  return NextResponse.json(events.map((e) => ({ ...e, date: serializeDueDate(e.date) })));
 }
 
 export async function POST(req: NextRequest) {
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
         domain: true,
       },
     });
-    return NextResponse.json(event, { status: 201 });
+    return NextResponse.json({ ...event, date: serializeDueDate(event.date) }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
   }

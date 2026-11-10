@@ -3,14 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
-import { TopBar } from '@/components/TopBar';
 import { TodayDashboard } from '@/components/views/TodayDashboard';
 import { TasksView } from '@/components/views/TasksView';
 import { RoutinesView } from '@/components/views/RoutinesView';
 import { LibraryView } from '@/components/views/LibraryView';
 import { DomainsView } from '@/components/views/DomainsView';
 import { WeeklyReviewView } from '@/components/views/WeeklyReviewView';
-import { CaptureModal } from '@/components/CaptureModal';
+import { CaptureModal, CaptureType } from '@/components/CaptureModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { useSuperlistSync } from '@/hooks/useSuperlistSync';
 
@@ -61,6 +60,15 @@ export default function HomePage() {
     syncNow();
   };
 
+  // The capture opens on the object of the current view: creating a task from
+  // the Tasks view, a habit from the Habits view, auto everywhere else.
+  const captureType: CaptureType =
+    currentView === 'tasks'
+      ? 'TASK'
+      : currentView === 'routines'
+      ? 'ROUTINE'
+      : 'AUTO';
+
   return (
     <div className="flex min-h-screen bg-[var(--paper-bg)] text-[var(--paper-text)]">
       {/* Desktop Sidebar */}
@@ -78,13 +86,9 @@ export default function HomePage() {
 
       {/* Main View Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar />
         <main className="flex-1 overflow-y-auto lg:pb-0 pb-28">
           {currentView === 'today' && (
-            <TodayDashboard
-              onNavigate={(v) => setCurrentView(v)}
-              onOpenCapture={() => setIsCaptureOpen(true)}
-            />
+            <TodayDashboard onNavigate={(v) => setCurrentView(v)} />
           )}
           {currentView === 'tasks' && <TasksView />}
           {currentView === 'routines' && <RoutinesView />}
@@ -106,6 +110,7 @@ export default function HomePage() {
       {/* Modals */}
       <CaptureModal
         isOpen={isCaptureOpen}
+        initialType={captureType}
         onClose={() => setIsCaptureOpen(false)}
         onCaptured={handleCaptured}
       />

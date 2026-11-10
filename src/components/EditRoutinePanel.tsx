@@ -2,21 +2,14 @@
 
 import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
+import { DAYS_OF_WEEK } from '@/lib/routines';
+
+export { DAYS_OF_WEEK };
 
 export const FREQUENCY_OPTIONS = [
   { value: 'DAILY', label: 'Daily' },
   { value: 'WEEKLY', label: 'Weekly (choose days)' },
   { value: 'MONTHLY', label: 'Monthly (choose day)' },
-];
-
-export const DAYS_OF_WEEK = [
-  { value: 0, label: 'Sun' },
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
-  { value: 6, label: 'Sat' },
 ];
 
 export function FrequencyBadge({ routine }: { routine: any }) {

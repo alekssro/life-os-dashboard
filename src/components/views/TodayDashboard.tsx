@@ -12,8 +12,6 @@ import {
   ExternalLink,
   Flame,
   Inbox,
-  Plus,
-  RefreshCw,
   Repeat,
   Sparkles,
   Square,
@@ -43,7 +41,6 @@ import { useDashboardStore } from '@/store/useDashboardStore';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
-  onOpenCapture: () => void;
 }
 
 /** Superlist details carried on an Inbox item's metadata blob. */
@@ -57,7 +54,7 @@ function parseInboxMetadata(raw: any): { dueDate?: string | null; superlistId?: 
   }
 }
 
-export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProps) {
+export function TodayDashboard({ onNavigate }: TodayDashboardProps) {
   const [resurfacedItem, setResurfacedItem] = useState<any | null>(null);
   const [attention, setAttention] = useState<any | null>(null);
   const [inboxItems, setInboxItems] = useState<any[]>([]);
@@ -196,7 +193,7 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8">
-      {/* Top Banner / Actions Bar */}
+      {/* Top Banner — the sync and capture actions live in the app bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-[var(--paper-border)] gap-4">
         <div>
           <h1 className="font-serif text-3xl font-bold tracking-tight text-[var(--paper-text)]">
@@ -209,26 +206,6 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
             {formatWeekday(todayDate)}, {formatDateDDMMYYYY(todayDate)}
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              fetchDashboardData();
-              loadSecondaryData();
-            }}
-            className="p-2 rounded-lg border border-[var(--paper-border)] bg-[var(--paper-card)] hover:bg-[var(--paper-card-subtle)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] transition"
-            title="Refresh dashboard"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onOpenCapture}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--paper-accent)] hover:opacity-90 text-white font-mono text-xs font-medium transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Capture (⌘J)</span>
-          </button>
-        </div>
       </div>
 
       {/* Main 2-Column Grid */}
@@ -239,7 +216,6 @@ export function TodayDashboard({ onNavigate, onOpenCapture }: TodayDashboardProp
               front, "Other Tasks" collapsed so the dashboard stays focused) */}
           <TaskHub
             title="Task Hub"
-            onOpenCapture={onOpenCapture}
             onEditTask={(id) => setEditingTaskId(id)}
             defaultCollapsed
           />

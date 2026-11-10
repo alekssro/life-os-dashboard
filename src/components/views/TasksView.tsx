@@ -3,17 +3,14 @@
 import React, { useState } from 'react';
 import {
   CheckSquare,
-  Plus,
   Filter,
 } from 'lucide-react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { TaskHub } from '@/components/TaskHub';
 import { EditTaskModal } from '@/components/EditTaskModal';
-import { CaptureModal } from '@/components/CaptureModal';
 
 export function TasksView() {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const tasks = useDashboardStore((s) => s.tasks);
   const domains = useDashboardStore((s) => s.domains);
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
@@ -46,7 +43,6 @@ export function TasksView() {
       {/* Primary Task Hub matching Today View and respecting active Focus Mode */}
       <TaskHub
         title="Tasks Overview"
-        onOpenCapture={() => setIsCaptureOpen(true)}
         onEditTask={(id) => setEditingId(id)}
       />
 
@@ -57,12 +53,6 @@ export function TasksView() {
         isOpen={Boolean(editingId)}
         onClose={() => setEditingId(null)}
         onSave={(id, updates) => handleSaveEdit(id, updates)}
-      />
-
-      <CaptureModal
-        isOpen={isCaptureOpen}
-        onClose={() => setIsCaptureOpen(false)}
-        onCaptured={() => fetchDashboardData()}
       />
     </div>
   );

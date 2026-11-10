@@ -23,10 +23,12 @@ import {
 } from '@/lib/date';
 
 function getGoogleCalendarUrl(date: Date | string, title?: string): string {
-  const d = new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  // Event dates are calendar days (YYYY-MM-DD) — read them as they are, so the
+  // deep link never points at the previous day in another timezone.
+  const iso = toISODate(date);
+  const yyyy = iso.slice(0, 4);
+  const mm = iso.slice(5, 7);
+  const dd = iso.slice(8, 10);
   if (title) {
     return `https://calendar.google.com/calendar/u/0/r/search?q=${encodeURIComponent(title)}`;
   }
