@@ -1,11 +1,26 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Calendar as CalendarIcon, MapPin, ExternalLink } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  Calendar as CalendarIcon,
+  MapPin,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { Event } from '@/types';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { filterEventsByFocus } from '@/lib/focusFilter';
-import { formatDateDDMMYYYY, formatWeekday, toISODate, todayISO } from '@/lib/date';
+import {
+  appDayStart,
+  formatDateDDMMYYYY,
+  formatDateYYYYMMDD,
+  formatWeekday,
+  getWeekEnd,
+  getWeekStart,
+  toISODate,
+  todayISO,
+} from '@/lib/date';
 
 function getGoogleCalendarUrl(date: Date | string, title?: string): string {
   const d = new Date(date);
@@ -68,6 +83,9 @@ export function CalendarView() {
   const events = useDashboardStore((s) => s.events);
   const focusMode = useDashboardStore((s) => s.focusMode);
 
+  // The week is the default view; "Show More" extends it to the next 14 days.
+  const [showMore, setShowMore] = useState(false);
+
   // Filter events based on active Focus context (Deep Work, Homelab, Personal)
   const filteredEvents = filterEventsByFocus(events, focusMode);
 
@@ -97,6 +115,24 @@ export function CalendarView() {
   const todayStr = todayISO();
   const tomorrowStr = addDaysISO(todayStr, 1);
 
+  // This calendar week (Monday → Sunday), following the app's 05:00 day
+  // boundary.
+  const weekStartStr = formatDateYYYYMMDD(getWeekStart(appDayStart()));
+  const weekEndStr = formatDateYYYYMMDD(getWeekEnd(appDayStart()));
+
+  const weekGroups = useMemo(
+    () => dayGroups.filter((g) => g.date >= weekStartStr && g.date <= weekEndStr),
+    [dayGroups, weekStartStr, weekEndStr]
+  );
+
+  const laterGroups = useMemo(
+    () => dayGroups.filter((g) => g.date > weekEndStr),
+    [dayGroups, weekEndStr]
+  );
+
+  const visibleGroups = showMore ? dayGroups : weekGroups;
+  const hiddenEventCount = laterGroups.reduce((count, g) => count + g.events.length, 0);
+
   const relativeLabel = (dateStr: string): string | null => {
     if (dateStr === todayStr) return 'Today';
     if (dateStr === tomorrowStr) return 'Tomorrow';
@@ -109,6 +145,9 @@ export function CalendarView() {
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4 text-[var(--paper-accent)]" />
           <h2 className="font-bold text-sm text-[var(--paper-text)]">Calendar</h2>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--paper-card-subtle)] border border-[var(--paper-border)] text-[var(--paper-muted)]">
+            {showMore ? 'Next 14 days' : 'This week'}
+          </span>
         </div>
         <a
           href="https://calendar.google.com"
@@ -127,7 +166,13 @@ export function CalendarView() {
         </div>
       ) : (
         <div className="space-y-2.5">
-          {dayGroups.map((group) => {
+          {visibleGroups.length === 0 && (
+            <div className="text-xs text-[var(--paper-muted)] italic py-3 text-center">
+              No events this week.
+            </div>
+          )}
+
+          {visibleGroups.map((group) => {
             const label = relativeLabel(group.date);
             return (
               <div key={group.date} className="space-y-1">
@@ -207,6 +252,26 @@ export function CalendarView() {
               </div>
             );
           })}
+
+          {hiddenEventCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowMore((prev) => !prev)}
+              className="w-full flex items-center justify-center gap-1 text-[11px] font-mono uppercase tracking-wider py-1.5 rounded-md border border-[var(--paper-border)] text-[var(--paper-muted)] hover:text-[var(--paper-text)] hover:border-[var(--paper-border-strong)] transition"
+            >
+              {showMore ? (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3" />
+                  Show More ({hiddenEventCount})
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
     </div>
