@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TaskStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { appDayStart, parseFlexibleDate, serializeDueDate, withCalendarDueDate } from '@/lib/date';
-import { pushSuperlistCompletion, pushSuperlistUpdate } from '@/lib/superlistWrite';
+import { pushSuperlistCompletion, pushSuperlistTaskDelete, pushSuperlistUpdate } from '@/lib/superlistWrite';
 import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
 
 const REMINDER_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
@@ -277,6 +277,32 @@ export async function DELETE(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Missing task id' }, { status: 400 });
+    }
+
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // A task that came from Superlist is deleted there too (it lands in the
+    // Superlist trash, so it stays restorable from there).
+    if (task.superlistId) {
+      const deleted = await pushSuperlistTaskDelete(task.superlistId);
+      if (!deleted.ok) {
+        const notConnected = /not connected/i.test(deleted.error || '');
+        if (!notConnected) {
+          // Keep the local task: deleting it here would only make the next
+          // sync pull it back from Superlist.
+          return NextResponse.json(
+            {
+              error: `Could not delete the task in Superlist: ${deleted.error}`,
+              superlistWarning: deleted.error,
+            },
+            { status: 502 }
+          );
+        }
+        // Superlist isn't connected — nothing to sync from, so delete locally.
+      }
     }
 
     await prisma.task.delete({ where: { id } });

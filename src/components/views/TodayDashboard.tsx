@@ -38,6 +38,7 @@ import { ObsidianCapture } from '@/components/ObsidianCapture';
 import { EditTaskModal } from '@/components/EditTaskModal';
 import { TriageDomainModal } from '@/components/TriageDomainModal';
 import { useDashboardStore } from '@/store/useDashboardStore';
+import { useDeleteTask } from '@/hooks/useDeleteTask';
 
 interface TodayDashboardProps {
   onNavigate: (view: NavItem) => void;
@@ -69,6 +70,7 @@ export function TodayDashboard({ onNavigate }: TodayDashboardProps) {
 
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
   const toggleTaskStarOptimistic = useDashboardStore((s) => s.toggleTaskStarOptimistic);
+  const { confirmAndDelete } = useDeleteTask();
   const tasks = useDashboardStore((s) => s.tasks);
   const domains = useDashboardStore((s) => s.domains);
 
@@ -115,6 +117,15 @@ export function TodayDashboard({ onNavigate }: TodayDashboardProps) {
       source: item.source,
       superlistId: item.superlistId,
     });
+  };
+
+  // Delete a task from the edit modal (also removes it in Superlist).
+  const handleDeleteTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const error = await confirmAndDelete(task);
+    setEditingTaskId(null);
+    if (error) alert(error);
   };
 
   const handleTriageAssigned = async (_domainId?: string, warning?: string) => {

@@ -11,6 +11,8 @@ interface EditTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (taskId: string, updates: any) => void;
+  /** Deletes the task (locally and in Superlist when it came from there). */
+  onDelete?: (taskId: string) => void;
 }
 
 export function EditTaskModal({
@@ -19,6 +21,7 @@ export function EditTaskModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
 }: EditTaskModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,6 +62,7 @@ export function EditTaskModal({
             onClose();
           }}
           onCancel={onClose}
+          onDelete={onDelete ? () => onDelete(task.id) : undefined}
         />
       </div>
     </div>

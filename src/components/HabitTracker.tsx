@@ -36,6 +36,7 @@ import {
 import { dueDateInMonth, firstDueDateInWeek } from '@/lib/routines';
 import { Routine } from '@/types';
 import { EditRoutineModal } from '@/components/EditRoutineModal';
+import { useDeleteTask } from '@/hooks/useDeleteTask';
 import { CalendarDateInput } from '@/components/CalendarDateInput';
 
 type ViewMode = 'WEEK' | 'MONTH' | 'YEAR';
@@ -99,6 +100,7 @@ export function HabitTracker({
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
 
   const [modalEditingId, setModalEditingId] = useState<string | null>(null);
+  const { confirmAndDeleteRoutine } = useDeleteTask();
 
   const todayStr = useMemo(() => toISODate(appDayStart()), []);
 
@@ -254,6 +256,15 @@ export function HabitTracker({
   };
 
   const toggle = (routine: Routine, date: string) => toggleHabitOptimistic(routine.id, date);
+
+  // Delete a habit from the edit modal (also removes it in Superlist).
+  const handleDeleteModalEdit = async (id: string) => {
+    const routine = routines.find((r) => r.id === id);
+    if (!routine) return;
+    const error = await confirmAndDeleteRoutine(routine);
+    setModalEditingId(null);
+    if (error) alert(error);
+  };
 
   const handleSaveModalEdit = async (id: string, updates: any) => {
     await fetch('/api/routines', {
@@ -670,6 +681,7 @@ export function HabitTracker({
         isOpen={Boolean(modalEditingId)}
         onClose={() => setModalEditingId(null)}
         onSave={handleSaveModalEdit}
+        onDelete={handleDeleteModalEdit}
       />
     </div>
   );

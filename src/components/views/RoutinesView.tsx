@@ -5,12 +5,23 @@ import { Flame } from 'lucide-react';
 import { HabitTracker } from '@/components/HabitTracker';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { EditRoutineModal } from '@/components/EditRoutineModal';
+import { useDeleteTask } from '@/hooks/useDeleteTask';
 
 export function RoutinesView() {
   const routines = useDashboardStore((s) => s.routines);
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { confirmAndDeleteRoutine } = useDeleteTask();
+
+  // Delete a habit (also removes it in Superlist when it came from there).
+  const handleDeleteEdit = async (id: string) => {
+    const routine = routines.find((r) => r.id === id);
+    if (!routine) return;
+    const error = await confirmAndDeleteRoutine(routine);
+    setEditingId(null);
+    if (error) alert(error);
+  };
 
   const handleSaveEdit = async (id: string, updates: any) => {
     await fetch('/api/routines', {
@@ -52,6 +63,7 @@ export function RoutinesView() {
         isOpen={Boolean(editingId)}
         onClose={() => setEditingId(null)}
         onSave={(id, updates) => handleSaveEdit(id, updates)}
+        onDelete={handleDeleteEdit}
       />
     </div>
   );

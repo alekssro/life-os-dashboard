@@ -440,3 +440,21 @@ export async function moveSuperlistTask(
     throw new Error(`Superlist move_task failed: ${detail}`);
   }
 }
+
+/**
+ * Delete a Superlist task. Superlist moves it to the trash rather than
+ * erasing it, so it can still be restored from there.
+ */
+export async function deleteSuperlistTask(token: string, taskUuid: string): Promise<void> {
+  if (!token) throw new Error('Superlist token is not configured');
+  if (!taskUuid) throw new Error('Missing Superlist task id');
+
+  const result = await callSuperlistTool(token, 'delete_task', { task_uuid: taskUuid });
+
+  if (result && typeof result === 'object' && 'success' in result && (result as any).success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist delete_task failed: ${detail}`);
+  }
+}

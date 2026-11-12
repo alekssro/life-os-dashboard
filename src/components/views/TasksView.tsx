@@ -4,14 +4,25 @@ import React, { useState } from 'react';
 import { useDashboardStore } from '@/store/useDashboardStore';
 import { TaskHub } from '@/components/TaskHub';
 import { EditTaskModal } from '@/components/EditTaskModal';
+import { useDeleteTask } from '@/hooks/useDeleteTask';
 
 export function TasksView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const tasks = useDashboardStore((s) => s.tasks);
   const domains = useDashboardStore((s) => s.domains);
   const fetchDashboardData = useDashboardStore((s) => s.fetchDashboardData);
+  const { confirmAndDelete } = useDeleteTask();
 
   const taskToEdit = tasks.find((t) => t.id === editingId);
+
+  // Delete a task from the edit modal (also removes it in Superlist).
+  const handleDeleteTask = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const error = await confirmAndDelete(task);
+    setEditingId(null);
+    if (error) alert(error);
+  };
 
   const handleSaveEdit = async (id: string, updates: any) => {
     await fetch('/api/tasks', {
@@ -49,6 +60,7 @@ export function TasksView() {
         isOpen={Boolean(editingId)}
         onClose={() => setEditingId(null)}
         onSave={(id, updates) => handleSaveEdit(id, updates)}
+        onDelete={handleDeleteTask}
       />
     </div>
   );

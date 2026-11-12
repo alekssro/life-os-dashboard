@@ -11,6 +11,7 @@ import { resolveSuperlistAccessToken, tryRefreshStoredToken } from '@/lib/superl
 import {
   completeSuperlistTask as completeSuperlistTaskWithToken,
   createSuperlistList as createSuperlistListWithToken,
+  deleteSuperlistTask as deleteSuperlistTaskWithToken,
   moveSuperlistTask as moveSuperlistTaskWithToken,
   updateSuperlistTask as updateSuperlistTaskWithToken,
   type UpdateSuperlistTaskArgs,
@@ -132,6 +133,36 @@ export async function pushSuperlistTaskMove(
     } catch (e) {
       const err = e as Error & { status?: number };
       return { ok: false, error: err?.message || 'Superlist move failed', status: err?.status } as SuperlistWriteResult;
+    }
+  };
+
+  const first = await attempt(resolved.token);
+  if (first.ok || !(first.error || '').includes('401')) return first;
+
+  const refreshed = await tryRefreshStoredToken();
+  if (!refreshed) {
+    return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
+  }
+  return attempt(refreshed);
+}
+
+/**
+ * Delete a task in Superlist (it lands in the Superlist trash, so it can be
+ * restored from there).
+ */
+export async function pushSuperlistTaskDelete(taskUuid: string): Promise<SuperlistWriteResult> {
+  if (!taskUuid) return { ok: false, error: 'Missing Superlist task id' };
+
+  const resolved = await resolveSuperlistAccessToken();
+  if (!resolved.ok) return { ok: false, error: resolved.message };
+
+  const attempt = async (token: string): Promise<SuperlistWriteResult> => {
+    try {
+      await deleteSuperlistTaskWithToken(token, taskUuid);
+      return { ok: true };
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      return { ok: false, error: err?.message || 'Superlist delete failed', status: err?.status } as SuperlistWriteResult;
     }
   };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, Star, X } from 'lucide-react';
+import { Check, Star, Trash2, X } from 'lucide-react';
 import { CalendarDateInput } from '@/components/CalendarDateInput';
 import { toISODate } from '@/lib/date';
 import { SLOT_LABELS } from '@/lib/pushClient';
@@ -21,9 +21,11 @@ interface EditTaskPanelProps {
   domains: any[];
   onSave: (updates: any) => void;
   onCancel: () => void;
+  /** When provided, the panel offers a delete action. */
+  onDelete?: () => void;
 }
 
-export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanelProps) {
+export function EditTaskPanel({ task, domains, onSave, onCancel, onDelete }: EditTaskPanelProps) {
   const [title, setTitle] = useState(task.title);
   const [domainId, setDomainId] = useState(task.domainId || '');
   const [dueDate, setDueDate] = useState(task.dueDate ? toISODate(task.dueDate) : '');
@@ -184,7 +186,18 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
         />
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-between gap-2">
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-[var(--paper-muted)] hover:text-red-500 hover:border-red-500/50 transition"
+            title="Delete this task (also deleted in Superlist when it came from there)"
+          >
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+        )}
+        <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
@@ -198,6 +211,7 @@ export function EditTaskPanel({ task, domains, onSave, onCancel }: EditTaskPanel
         >
           <Check className="w-3 h-3" /> Save
         </button>
+        </div>
       </div>
     </form>
   );

@@ -38,6 +38,10 @@ interface DashboardState {
   toggleTaskOptimistic: (taskId: string) => Promise<boolean>;
   toggleTaskStarOptimistic: (taskId: string) => Promise<boolean>;
   clearCompletedTasks: () => Promise<number>;
+  /** Delete a task (locally and in Superlist when it came from there). */
+  deleteTask: (taskId: string) => Promise<{ ok: boolean; warning?: string; error?: string }>;
+  /** Delete a habit (locally and in Superlist when it came from there). */
+  deleteRoutine: (routineId: string) => Promise<{ ok: boolean; warning?: string; error?: string }>;
   toggleHabitOptimistic: (routineId: string, dateStr?: string) => Promise<boolean>;
   loadHabitHistory: (startDate?: string, endDate?: string) => Promise<void>;
 }
@@ -206,6 +210,52 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Fast rollback
       set({ tasks: prevTasks });
       return false;
+    }
+  },
+
+  deleteTask: async (taskId: string) => {
+    const prevTasks = get().tasks;
+    const task = prevTasks.find((t) => t.id === taskId);
+    if (!task) return { ok: false, error: 'Task not found' };
+
+    // Optimistic: drop it from the list right away.
+    set({ tasks: prevTasks.filter((t) => t.id !== taskId) });
+
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || `Failed to delete task: ${res.statusText}`);
+      }
+      return { ok: true, warning: data?.superlistWarning };
+    } catch (err) {
+      console.error('Failed to delete task, rolling back:', err);
+      // Fast rollback — the task comes back if the delete failed.
+      set({ tasks: prevTasks });
+      return { ok: false, error: (err as Error).message };
+    }
+  },
+
+  deleteRoutine: async (routineId: string) => {
+    const prevRoutines = get().routines;
+    const routine = prevRoutines.find((r) => r.id === routineId);
+    if (!routine) return { ok: false, error: 'Habit not found' };
+
+    // Optimistic: drop it from the list right away.
+    set({ routines: prevRoutines.filter((r) => r.id !== routineId) });
+
+    try {
+      const res = await fetch(`/api/routines?id=${routineId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || `Failed to delete habit: ${res.statusText}`);
+      }
+      return { ok: true, warning: data?.superlistWarning };
+    } catch (err) {
+      console.error('Failed to delete habit, rolling back:', err);
+      // Fast rollback — the habit comes back if the delete failed.
+      set({ routines: prevRoutines });
+      return { ok: false, error: (err as Error).message };
     }
   },
 

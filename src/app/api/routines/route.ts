@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { appDayStart, todayISO, toISODate } from '@/lib/date';
 import { isDueToday } from '@/lib/routines';
 import { computeStreak, StreakStats } from '@/lib/streaks';
-import { pushSuperlistCompletion } from '@/lib/superlistWrite';
+import { pushSuperlistCompletion, pushSuperlistTaskDelete } from '@/lib/superlistWrite';
 
 /**
  * Recomputes a habit's streak statistics from its full completion history.
@@ -287,6 +287,31 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing routine id' }, { status: 400 });
+
+    const routine = await prisma.routine.findUnique({ where: { id } });
+    if (!routine) {
+      return NextResponse.json({ error: 'Habit not found' }, { status: 404 });
+    }
+
+    // A habit that came from a recurring Superlist task is deleted there too
+    // (it lands in the Superlist trash, so it stays restorable from there).
+    if (routine.superlistId) {
+      const deleted = await pushSuperlistTaskDelete(routine.superlistId);
+      if (!deleted.ok) {
+        const notConnected = /not connected/i.test(deleted.error || '');
+        if (!notConnected) {
+          // Keep the habit: deleting it here would only make the next sync
+          // pull it back from Superlist.
+          return NextResponse.json(
+            {
+              error: `Could not delete the habit in Superlist: ${deleted.error}`,
+              superlistWarning: deleted.error,
+            },
+            { status: 502 }
+          );
+        }
+      }
+    }
 
     await prisma.routine.delete({ where: { id } });
     return NextResponse.json({ success: true });

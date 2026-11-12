@@ -10,6 +10,8 @@ interface EditRoutineModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (routineId: string, updates: any) => void;
+  /** Deletes the habit (locally and in Superlist when it came from there). */
+  onDelete?: (routineId: string) => void;
 }
 
 export function EditRoutineModal({
@@ -17,6 +19,7 @@ export function EditRoutineModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
 }: EditRoutineModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +59,7 @@ export function EditRoutineModal({
             onClose();
           }}
           onCancel={onClose}
+          onDelete={onDelete ? () => onDelete(routine.id) : undefined}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Trash2, X } from 'lucide-react';
 import { DAYS_OF_WEEK } from '@/lib/routines';
 
 export { DAYS_OF_WEEK };
@@ -41,9 +41,11 @@ interface EditRoutinePanelProps {
   routine: any;
   onSave: (updates: any) => void;
   onCancel: () => void;
+  /** When provided, the panel offers a delete action. */
+  onDelete?: () => void;
 }
 
-export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanelProps) {
+export function EditRoutinePanel({ routine, onSave, onCancel, onDelete }: EditRoutinePanelProps) {
   const [title, setTitle] = useState(routine.title);
   const [icon, setIcon] = useState(routine.icon || '✨');
   const [timeOfDay, setTimeOfDay] = useState(routine.timeOfDay);
@@ -186,7 +188,18 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-between gap-2">
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex items-center gap-1 px-3 py-1 rounded border border-[var(--paper-border)] text-xs font-mono text-[var(--paper-muted)] hover:text-red-500 hover:border-red-500/50 transition"
+            title="Delete this habit (also deleted in Superlist when it came from there)"
+          >
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+        )}
+        <div className="flex justify-end gap-2">
         <button
           type="button"
           onClick={onCancel}
@@ -200,6 +213,7 @@ export function EditRoutinePanel({ routine, onSave, onCancel }: EditRoutinePanel
         >
           <Check className="w-3 h-3" /> Save
         </button>
+        </div>
       </div>
     </form>
   );
