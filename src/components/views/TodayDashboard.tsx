@@ -249,6 +249,7 @@ export function TodayDashboard({ onNavigate }: TodayDashboardProps) {
             isOpen={Boolean(editingTaskId)}
             onClose={() => setEditingTaskId(null)}
             onSave={(id, updates) => saveTask(id, updates)}
+            onDelete={handleDeleteTask}
           />
         </div>
 
