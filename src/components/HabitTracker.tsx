@@ -481,13 +481,13 @@ export function HabitTracker({
               if (onEditHabit) onEditHabit(routine.id);
               else setModalEditingId(routine.id);
             }}
-            className="text-xs sm:text-sm font-medium text-[var(--paper-text)] truncate min-w-0 cursor-pointer hover:text-[var(--paper-accent)] transition"
+            className="text-xs sm:text-sm font-medium text-[var(--paper-text)] flex-1 min-w-0 break-words cursor-pointer hover:text-[var(--paper-accent)] transition"
             title="Click to edit habit"
           >
             {routine.icon} {routine.title}
           </span>
 
-          <span className="flex items-center gap-2 text-xs font-mono shrink-0 ml-auto">
+          <span className="flex items-center gap-2 text-xs font-mono shrink-0">
             <span
               className={`flex items-center gap-1 font-bold ${
                 routine.atRisk ? 'text-amber-500' : 'text-[var(--paper-accent)]'
