@@ -11,6 +11,7 @@ import { resolveSuperlistAccessToken, tryRefreshStoredToken } from '@/lib/superl
 import {
   completeSuperlistTask as completeSuperlistTaskWithToken,
   createSuperlistList as createSuperlistListWithToken,
+  createSuperlistTask as createSuperlistTaskWithToken,
   deleteSuperlistTask as deleteSuperlistTaskWithToken,
   moveSuperlistTask as moveSuperlistTaskWithToken,
   updateSuperlistTask as updateSuperlistTaskWithToken,
@@ -86,6 +87,12 @@ export interface SuperlistListWriteResult extends SuperlistWriteResult {
   url?: string | null;
 }
 
+export interface SuperlistTaskWriteResult extends SuperlistWriteResult {
+  taskId?: string;
+  listId?: string | null;
+  url?: string | null;
+}
+
 /**
  * Create a list in Superlist (used when a Life OS Domain has no list yet).
  */
@@ -100,6 +107,50 @@ export async function pushSuperlistListCreation(title: string): Promise<Superlis
       const list = await createSuperlistListWithToken(token, title);
       return { ok: true, listId: list.listId, url: list.url };
     } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  };
+
+  const first = await attempt(resolved.token);
+  if (first.ok || !(first.error || '').includes('401')) return first;
+
+  const refreshed = await tryRefreshStoredToken();
+  if (!refreshed) {
+    return { ok: false, error: 'Superlist access token expired and could not be refreshed' };
+  }
+  return attempt(refreshed);
+}
+
+/**
+ * Create a task in Superlist for a newly created Life OS task, refreshing the
+ * access token once on a 401. Never throws — callers treat failure as
+ * non-fatal so the local change still stands.
+ */
+export async function pushSuperlistTaskCreation(
+  title: string,
+  listUuid: string | null | undefined,
+  dueDate: string | null | undefined,
+  priority: 'high' | 'normal' | 'low' | null | undefined,
+  notes: string | null | undefined
+): Promise<SuperlistTaskWriteResult> {
+  if (!title?.trim()) return { ok: false, error: 'Missing task title' };
+
+  const resolved = await resolveSuperlistAccessToken();
+  if (!resolved.ok) return { ok: false, error: resolved.message };
+
+  const attempt = async (token: string): Promise<SuperlistTaskWriteResult> => {
+    try {
+      const task = await createSuperlistTaskWithToken(token, {
+        title,
+        listUuid: listUuid ?? null,
+        dueDate: dueDate ?? null,
+        priority: priority ?? null,
+        notes: notes ?? null,
+      });
+      return { ok: true, taskId: task.taskId, listId: task.listId, url: task.url };
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (err?.status === 401) return { ok: false, error: '401', status: 401 } as SuperlistTaskWriteResult;
       return { ok: false, error: (e as Error).message };
     }
   };

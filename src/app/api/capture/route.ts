@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { parseCaptureInput } from '@/lib/ai/parser';
 import { parseFlexibleDate } from '@/lib/date';
 import { validateApiKey, checkRateLimit } from '@/lib/auth';
+import { mirrorNewTaskToSuperlist } from '@/lib/superlistTaskCreation';
 
 export async function POST(req: NextRequest) {
   // Rate limiting & security
@@ -255,6 +256,18 @@ export async function POST(req: NextRequest) {
           },
         });
 
+        // Mirror the new task into Superlist when connected (non-fatal).
+        await mirrorNewTaskToSuperlist({
+          taskId: task.id,
+          title: task.title,
+          notes: task.notes,
+          dueDate: task.dueDate,
+          priority: task.priority,
+          domainId: task.domainId,
+          superlistId: task.superlistId,
+          source: task.source,
+        }).catch((e) => console.error('Superlist mirror error:', e));
+
         return NextResponse.json({ success: true, type: 'TASK', item: task });
       }
     }
@@ -386,6 +399,18 @@ export async function POST(req: NextRequest) {
         type: 'TASK_CREATED',
       },
     });
+
+    // Mirror the new task into Superlist when connected (non-fatal).
+    await mirrorNewTaskToSuperlist({
+      taskId: task.id,
+      title: task.title,
+      notes: task.notes,
+      dueDate: task.dueDate,
+      priority: task.priority,
+      domainId: task.domainId,
+      superlistId: task.superlistId,
+      source: task.source,
+    }).catch((e) => console.error('Superlist mirror error:', e));
 
     return NextResponse.json({
       success: true,

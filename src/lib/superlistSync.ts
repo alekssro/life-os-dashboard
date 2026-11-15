@@ -417,6 +417,53 @@ export async function createSuperlistList(token: string, title: string): Promise
   return { listId, url: buildSuperlistListUrl(listId) };
 }
 
+export interface SuperlistTaskResult {
+  taskId: string;
+  listId: string | null;
+  url: string | null;
+}
+
+/**
+ * Create a new task in Superlist via the MCP `add_task` tool.
+ */
+export async function createSuperlistTask(
+  token: string,
+  args: {
+    title: string;
+    listUuid?: string | null;
+    dueDate?: string | null;
+    priority?: 'high' | 'normal' | 'low' | null;
+    notes?: string | null;
+  }
+): Promise<SuperlistTaskResult> {
+  if (!token) throw new Error('Superlist token is not configured');
+  const title = (args.title || '').trim();
+  if (!title) throw new Error('Missing task title');
+
+  const result = await callSuperlistTool(token, 'add_task', {
+    title,
+    ...(args.listUuid ? { list_uuid: args.listUuid } : {}),
+    ...(args.dueDate ? { due_date: args.dueDate } : {}),
+    ...(args.priority ? { priority: args.priority } : {}),
+    ...(args.notes !== undefined ? { notes: args.notes } : {}),
+  });
+
+  if (result && typeof result === 'object' && 'success' in result && (result as any).success === false) {
+    const detail = (result as any).results
+      ? JSON.stringify((result as any).results).slice(0, 200)
+      : JSON.stringify(result).slice(0, 200);
+    throw new Error(`Superlist add_task failed: ${detail}`);
+  }
+
+  const task = result?.task || result?.data || result;
+  const taskId = task?.uuid || task?.id || task?.task_uuid;
+  const listId = task?.list_uuid || task?.listId || null;
+  if (!taskId) {
+    throw new Error('Superlist add_task did not return a task id');
+  }
+  return { taskId, listId, url: buildSuperlistTaskUrl(listId || null, taskId) };
+}
+
 /**
  * Move a Superlist task into a list (or back to the inbox when no list is given).
  */

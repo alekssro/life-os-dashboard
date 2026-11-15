@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { appDayStart, parseFlexibleDate, serializeDueDate, withCalendarDueDate } from '@/lib/date';
 import { pushSuperlistCompletion, pushSuperlistTaskDelete, pushSuperlistUpdate } from '@/lib/superlistWrite';
 import type { UpdateSuperlistTaskArgs } from '@/lib/superlistSync';
+import { mirrorNewTaskToSuperlist } from '@/lib/superlistTaskCreation';
 
 const REMINDER_SLOTS = ['MORNING', 'AFTERNOON', 'EVENING'];
 const REMINDER_TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
@@ -116,6 +117,18 @@ export async function POST(req: NextRequest) {
         data: { lastActivityAt: new Date() },
       });
     }
+
+    // Mirror the new task into Superlist when connected (non-fatal).
+    await mirrorNewTaskToSuperlist({
+      taskId: task.id,
+      title: task.title,
+      notes: task.notes,
+      dueDate: task.dueDate,
+      priority: task.priority,
+      domainId: task.domainId,
+      superlistId: task.superlistId,
+      source: task.source,
+    }).catch((e) => console.error('Superlist mirror error:', e));
 
     return NextResponse.json(withCalendarDueDate(task), { status: 201 });
   } catch (error) {
