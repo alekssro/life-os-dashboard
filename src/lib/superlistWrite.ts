@@ -122,6 +122,25 @@ export async function pushSuperlistListCreation(title: string): Promise<Superlis
 }
 
 /**
+ * Map Life OS task priorities to Superlist's expected values
+ * (none | high | medium | low).
+ */
+function mapPriorityToSuperlist(priority: string | null | undefined): 'none' | 'high' | 'medium' | 'low' | null {
+  if (!priority) return null;
+  switch (priority.toUpperCase()) {
+    case 'TOP_3':
+    case 'HIGH':
+      return 'high';
+    case 'NORMAL':
+      return 'medium';
+    case 'LOW':
+      return 'low';
+    default:
+      return null;
+  }
+}
+
+/**
  * Create a task in Superlist for a newly created Life OS task, refreshing the
  * access token once on a 401. Never throws — callers treat failure as
  * non-fatal so the local change still stands.
@@ -130,7 +149,7 @@ export async function pushSuperlistTaskCreation(
   title: string,
   listUuid: string | null | undefined,
   dueDate: string | null | undefined,
-  priority: 'high' | 'normal' | 'low' | null | undefined,
+  priority: string | null | undefined,
   notes: string | null | undefined
 ): Promise<SuperlistTaskWriteResult> {
   if (!title?.trim()) return { ok: false, error: 'Missing task title' };
@@ -144,7 +163,7 @@ export async function pushSuperlistTaskCreation(
         title,
         listUuid: listUuid ?? null,
         dueDate: dueDate ?? null,
-        priority: priority ?? null,
+        priority: mapPriorityToSuperlist(priority ?? null),
         notes: notes ?? null,
       });
       return { ok: true, taskId: task.taskId, listId: task.listId, url: task.url };

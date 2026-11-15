@@ -50,7 +50,7 @@ export async function mirrorNewTaskToSuperlist(params: MirrorNewTaskParams): Pro
     params.title,
     listId,
     serializeDueDate(params.dueDate),
-    params.priority as 'high' | 'normal' | 'low' | null,
+    params.priority,
     params.notes ?? null
   );
   if (!created.ok || !created.taskId) {

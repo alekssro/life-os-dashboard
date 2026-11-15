@@ -432,7 +432,7 @@ export async function createSuperlistTask(
     title: string;
     listUuid?: string | null;
     dueDate?: string | null;
-    priority?: 'high' | 'normal' | 'low' | null;
+    priority?: 'none' | 'high' | 'medium' | 'low' | null;
     notes?: string | null;
   }
 ): Promise<SuperlistTaskResult> {
